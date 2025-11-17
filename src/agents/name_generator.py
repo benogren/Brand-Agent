@@ -316,7 +316,7 @@ For each name, provide: brand_name, naming_strategy, rationale, tagline, syllabl
 
     def _generate_with_vertexai(self, user_brief: str, num_names: int) -> List[Dict[str, Any]]:
         """
-        Generate brand names using real Vertex AI Gemini model.
+        Generate brand names using Google Gen AI SDK with Vertex AI.
 
         Args:
             user_brief: Formatted user brief prompt
@@ -328,23 +328,82 @@ For each name, provide: brand_name, naming_strategy, rationale, tagline, syllabl
         Raises:
             Exception: If Vertex AI call fails
         """
-        import vertexai
-        from vertexai.generative_models import GenerativeModel
-
-        # Initialize Vertex AI
-        vertexai.init(project=self.project_id, location=self.location)
-
-        # Use Gemini 1.5 Pro for creative generation
-        # Note: gemini-2.5-pro is not yet available in Vertex AI
-        model = GenerativeModel("gemini-1.5-pro-002")
+        from google import genai
+        from google.genai import types
+        import os
 
         # Combine instruction and user brief
         full_prompt = f"{NAME_GENERATOR_INSTRUCTION}\n\n{user_brief}\n\nPlease return the results as a JSON array of objects with the following structure:\n{{\n  \"brand_name\": \"ExampleName\",\n  \"naming_strategy\": \"portmanteau|descriptive|invented|acronym\",\n  \"rationale\": \"Brief explanation\",\n  \"tagline\": \"5-8 word tagline\",\n  \"syllables\": 2,\n  \"memorable_score\": 8\n}}\n\nReturn ONLY the JSON array, no other text."
 
-        logger.info("Calling Vertex AI Gemini 2.5 Pro...")
+        # Try Vertex AI first, fall back to Google AI if it fails
+        response = None
+        last_error = None
 
-        # Generate content
-        response = model.generate_content(full_prompt)
+        # Attempt 1: Try Vertex AI
+        try:
+            logger.info("Attempting Vertex AI endpoint...")
+            client = genai.Client(
+                vertexai=True,
+                project=self.project_id,
+                location=self.location
+            )
+            response = client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=full_prompt
+            )
+            logger.info("Successfully used Vertex AI!")
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Vertex AI failed: {e}")
+
+            # Attempt 2: Fall back to Google AI API (non-Vertex AI)
+            logger.info("Falling back to Google AI API (non-Vertex)...")
+            api_key = os.getenv('GOOGLE_API_KEY')
+            if not api_key:
+                raise Exception(f"Both Vertex AI and Google AI API failed. Vertex AI: {last_error}, Google AI: GOOGLE_API_KEY not found")
+
+            # Temporarily clear Google Cloud env vars to force Google AI API mode
+            # Save them before clearing
+            saved_project = os.environ.get('GOOGLE_CLOUD_PROJECT')
+            saved_location = os.environ.get('GOOGLE_CLOUD_LOCATION')
+            saved_genai_use_vertexai = os.environ.get('GOOGLE_GENAI_USE_VERTEXAI')
+
+            try:
+                # Clear ALL GCP-related env vars to prevent Vertex AI mode
+                os.environ.pop('GOOGLE_CLOUD_PROJECT', None)
+                os.environ.pop('GOOGLE_CLOUD_LOCATION', None)
+                os.environ.pop('GOOGLE_GENAI_USE_VERTEXAI', None)
+
+                # Create client - without GCP env vars, it will use Google AI API
+                client = genai.Client(api_key=api_key)
+
+                # Use the Google AI API endpoint with correct model name
+                # Google AI has gemini-2.5-flash available
+                response = client.models.generate_content(
+                    model="models/gemini-2.5-flash",
+                    contents=full_prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=0.9,
+                        top_p=0.95
+                    )
+                )
+                logger.info("Successfully used Google AI API with gemini-2.5-flash!")
+            except Exception as e2:
+                import traceback
+                logger.error(f"Google AI API also failed: {e2}")
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                raise Exception(f"Both Vertex AI and Google AI API failed. Vertex AI: {last_error}, Google AI: {e2}")
+            finally:
+                # Always restore environment variables
+                if saved_project:
+                    os.environ['GOOGLE_CLOUD_PROJECT'] = saved_project
+                if saved_location:
+                    os.environ['GOOGLE_CLOUD_LOCATION'] = saved_location
+                if saved_genai_use_vertexai:
+                    os.environ['GOOGLE_GENAI_USE_VERTEXAI'] = saved_genai_use_vertexai
+
+        if response is None:
+            raise Exception("Failed to generate content from any API")
 
         # Parse the response
         try:
