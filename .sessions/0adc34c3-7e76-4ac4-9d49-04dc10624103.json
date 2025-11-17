@@ -1,0 +1,37 @@
+{
+  "session_id": "0adc34c3-7e76-4ac4-9d49-04dc10624103",
+  "user_id": "test_user_phase2",
+  "created_at": "2025-11-17T20:51:40.885366",
+  "updated_at": "2025-11-17T20:51:40.888209",
+  "metadata": {},
+  "events": [
+    {
+      "event_id": "c9f5b645-2f35-49c0-8a65-53d62a4e6951",
+      "event_type": "message",
+      "author": "user",
+      "content": "User requested fitness app brand names",
+      "timestamp": "2025-11-17T20:51:40.887197",
+      "metadata": {}
+    },
+    {
+      "event_id": "0ca400d1-7af2-44aa-a7ac-7b449e72e903",
+      "event_type": "generation",
+      "author": "agent",
+      "content": "Generated brand name: FitFlow",
+      "timestamp": "2025-11-17T20:51:40.887716",
+      "metadata": {}
+    }
+  ],
+  "generated_brands": [
+    {
+      "brand_id": "092837ce-0c87-4902-9208-c9c36a36e5fc",
+      "generated_at": "2025-11-17T20:51:40.888198",
+      "brand_name": "FitFlow",
+      "naming_strategy": "portmanteau",
+      "tagline": "Where fitness meets innovation",
+      "validation_status": "clear",
+      "validation_score": 90,
+      "seo_score": 85
+    }
+  ]
+}

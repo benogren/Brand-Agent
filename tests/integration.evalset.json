@@ -1,0 +1,238 @@
+{
+  "evalset_id": "brand_studio_integration_tests",
+  "description": "Comprehensive integration tests for AI Brand Studio multi-agent system",
+  "version": "1.0",
+  "test_cases": [
+    {
+      "eval_id": "healthcare_mental_wellness_app",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "I need a brand name for an AI-powered mental wellness app for Gen Z users aged 18-25. The app provides daily check-ins and mood tracking. Brand personality should be warm, approachable, and non-clinical."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 15,
+            "num_names_max": 50,
+            "domain_available_com_min": 3,
+            "trademark_risk_low_min": 5,
+            "seo_score_avg_min": 70,
+            "has_taglines": true,
+            "has_brand_story": true,
+            "tone_match": "warm"
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "fintech_expense_tracker",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "Building a fintech app that helps freelancers track expenses and automate tax filing. Target audience is creative professionals (designers, writers, photographers). Brand should feel professional but not stuffy."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 15,
+            "domain_available_com_min": 5,
+            "trademark_risk_low_min": 3,
+            "names_contain_finance_keywords": true,
+            "seo_score_avg_min": 65,
+            "tone_match": "professional"
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "ecommerce_inventory_saas",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "Enterprise SaaS platform for e-commerce inventory management across multiple warehouses. Target: operations managers at mid-size retailers. Professional, trustworthy tone."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 15,
+            "trademark_risk_low_min": 5,
+            "names_pronounceable": true,
+            "has_brand_story": true
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "meal_planning_families",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "AI-powered meal planning app for busy millennial parents. Quick recipes, nutrition tracking, grocery lists. Target: parents aged 28-40 with young children. Warm, helpful, family-oriented personality."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 20,
+            "domain_available_com_min": 5,
+            "has_taglines": true,
+            "tagline_count": 5,
+            "has_brand_story": true,
+            "story_length_min": 150,
+            "tone_match": "warm"
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "fitness_coaching_app",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "AI-powered fitness coaching with personalized workout plans for fitness enthusiasts aged 25-40. Brand personality: innovative and motivating."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 15,
+            "domain_available_com_min": 3,
+            "seo_score_avg_min": 70,
+            "has_brand_story": true,
+            "tone_match": "innovative"
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "b2b_sales_platform",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "Sales lead qualification and scoring platform using AI. For B2B sales teams at mid-market companies (100-1000 employees). Professional, data-driven, results-oriented."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 15,
+            "domain_available_ai_min": 3,
+            "trademark_risk_low_min": 5,
+            "names_contain_b2b_keywords": true,
+            "has_seo_metadata": true
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "sustainable_fashion_marketplace",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "E-commerce sustainable fashion marketplace connecting eco-conscious shoppers with ethical brands. Target: women aged 25-40 who value sustainability. Playful yet meaningful personality."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 20,
+            "domain_available_com_min": 5,
+            "has_taglines": true,
+            "seo_score_avg_min": 75,
+            "tone_match": "playful"
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "remote_work_productivity",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "Productivity app for remote workers with time tracking, focus modes, and team collaboration. Target: distributed teams at tech startups. Innovative and efficient."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 15,
+            "domain_available_io_min": 3,
+            "has_brand_story": true,
+            "names_contain_tech_keywords": true
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "educational_kids_app",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "Educational app for kids aged 6-12 with interactive learning games. Target audience is parents looking for screen time with educational value. Fun, safe, engaging personality."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 20,
+            "domain_available_com_min": 5,
+            "has_taglines": true,
+            "tone_match": "playful",
+            "names_kid_friendly": true
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "luxury_travel_concierge",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "AI-powered luxury travel concierge service for high-net-worth individuals. Personalized itineraries, exclusive access, 24/7 support. Sophisticated, exclusive, premium."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 15,
+            "trademark_risk_low_min": 3,
+            "has_brand_story": true,
+            "tone_match": "luxury",
+            "seo_score_avg_min": 70
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "healthcare_telemedicine",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "Telemedicine platform for remote consultations with specialists. Target: patients aged 40-65 with chronic conditions. Professional, trustworthy, caring."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 15,
+            "domain_available_com_min": 3,
+            "trademark_risk_low_min": 5,
+            "has_seo_metadata": true,
+            "tone_match": "professional"
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "crypto_wallet_app",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{
+              "text": "Cryptocurrency wallet and portfolio tracker for crypto investors. Simple interface, strong security. Target: millennials new to crypto. Innovative but accessible."
+            }]
+          },
+          "expected_output": {
+            "num_names_min": 15,
+            "domain_available_io_min": 3,
+            "has_brand_story": true,
+            "names_contain_crypto_keywords": true
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "agent_name": "brand_studio_agent",
+  "description": "AI Brand Studio multi-agent system for generating legally-clear, SEO-optimized brand names with complete marketing narratives",
+  "version": "1.0.0",
+  "deployment": {
+    "min_instances": 0,
+    "max_instances": 5,
+    "resource_limits": {
+      "cpu": "2",
+      "memory": "4Gi"
+    },
+    "timeout": "600s",
+    "concurrency": 1
+  },
+  "environment_variables": {
+    "GOOGLE_GENAI_USE_VERTEXAI": "1",
+    "LOG_LEVEL": "INFO",
+    "ENABLE_TRACING": "true",
+    "MAX_NAME_CANDIDATES": "50",
+    "MIN_NAME_CANDIDATES": "20",
+    "MAX_LOOP_ITERATIONS": "3",
+    "DOMAIN_CACHE_TTL_SECONDS": "300"
+  },
+  "scaling": {
+    "auto_scaling_enabled": true,
+    "scale_to_zero_enabled": true,
+    "scale_down_delay": "300s"
+  },
+  "monitoring": {
+    "enable_cloud_logging": true,
+    "enable_cloud_monitoring": true,
+    "enable_cloud_trace": true,
+    "log_level": "INFO"
+  },
+  "security": {
+    "service_account": "brand-studio-sa",
+    "require_authentication": false
+  },
+  "metadata": {
+    "tags": ["brand-studio", "multi-agent", "vertex-ai"],
+    "labels": {
+      "app": "brand-studio",
+      "version": "1.0",
+      "environment": "production"
+    }
+  }
+}

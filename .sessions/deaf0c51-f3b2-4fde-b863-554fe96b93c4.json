@@ -1,0 +1,27 @@
+{
+  "session_id": "deaf0c51-f3b2-4fde-b863-554fe96b93c4",
+  "user_id": "test_user",
+  "created_at": "2025-11-17T20:47:18.145696",
+  "updated_at": "2025-11-17T20:47:18.146465",
+  "metadata": {},
+  "events": [
+    {
+      "event_id": "f120c09f-e478-477c-b630-ebd0fd53d7d2",
+      "event_type": "message",
+      "author": "user",
+      "content": "User requested brand names",
+      "timestamp": "2025-11-17T20:47:18.146295",
+      "metadata": {}
+    }
+  ],
+  "generated_brands": [
+    {
+      "brand_id": "8780860c-9c05-4b20-abee-2bcbc6547cae",
+      "generated_at": "2025-11-17T20:47:18.146462",
+      "brand_name": "TestBrand",
+      "naming_strategy": "portmanteau",
+      "tagline": "Innovation meets simplicity",
+      "validation_status": "clear"
+    }
+  ]
+}
