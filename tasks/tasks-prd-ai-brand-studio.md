@@ -158,13 +158,13 @@ validated: true
   - [x] 2.5 Create src/main.py entry point to invoke orchestrator with sample input
   - [x] 2.6 Test orchestrator agent with basic "echo" sub-agent to verify coordination
 
-- [ ] 3.0 Implement Domain Availability Checker Tool
-  - [ ] 3.1 Create src/tools/domain_checker.py with check_domain_availability function
-  - [ ] 3.2 Integrate python-whois library to check .com, .ai, .io domains
-  - [ ] 3.3 Implement error handling for WHOIS lookup failures (assume available on exception)
-  - [ ] 3.4 Add caching mechanism (5-minute cache) to reduce API calls
-  - [ ] 3.5 Write unit tests in tests/test_domain_checker.py
-  - [ ] 3.6 Register domain checker as ADK tool for agent use
+- [x] 3.0 Implement Domain Availability Checker Tool
+  - [x] 3.1 Create src/tools/domain_checker.py with check_domain_availability function
+  - [x] 3.2 Integrate python-whois library to check .com, .ai, .io domains
+  - [x] 3.3 Implement error handling for WHOIS lookup failures (assume available on exception)
+  - [x] 3.4 Add caching mechanism (5-minute cache) to reduce API calls
+  - [x] 3.5 Write unit tests in tests/test_domain_checker.py
+  - [x] 3.6 Register domain checker as ADK tool for agent use
 
 - [ ] 4.0 Implement Basic Name Generator Agent (No RAG)
   - [ ] 4.1 Create src/agents/name_generator.py with LlmAgent using gemini-2.5-pro
