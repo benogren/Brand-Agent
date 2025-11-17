@@ -166,13 +166,13 @@ validated: true
   - [x] 3.5 Write unit tests in tests/test_domain_checker.py
   - [x] 3.6 Register domain checker as ADK tool for agent use
 
-- [ ] 4.0 Implement Basic Name Generator Agent (No RAG)
-  - [ ] 4.1 Create src/agents/name_generator.py with LlmAgent using gemini-2.5-pro
-  - [ ] 4.2 Write name generation prompt to create 20-50 brand names based on user brief
-  - [ ] 4.3 Implement support for brand personality customization (playful, professional, innovative, luxury)
-  - [ ] 4.4 Add multiple naming strategies in prompt: portmanteau, descriptive, invented, acronyms
-  - [ ] 4.5 Ensure output format includes brand name, rationale, and suggested tagline
-  - [ ] 4.6 Test name generator with sample inputs (healthcare app, fintech, e-commerce)
+- [x] 4.0 Implement Basic Name Generator Agent (No RAG)
+  - [x] 4.1 Create src/agents/name_generator.py with LlmAgent using gemini-2.5-pro
+  - [x] 4.2 Write name generation prompt to create 20-50 brand names based on user brief
+  - [x] 4.3 Implement support for brand personality customization (playful, professional, innovative, luxury)
+  - [x] 4.4 Add multiple naming strategies in prompt: portmanteau, descriptive, invented, acronyms
+  - [x] 4.5 Ensure output format includes brand name, rationale, and suggested tagline
+  - [x] 4.6 Test name generator with sample inputs (healthcare app, fintech, e-commerce)
 
 - [ ] 5.0 Create Basic CLI for Testing
   - [ ] 5.1 Create src/cli.py with argparse or click for command-line interaction
