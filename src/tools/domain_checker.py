@@ -174,19 +174,17 @@ def _check_single_domain(domain: str) -> bool:
             logger.debug(f"{domain} is not registered (available)")
             return True
 
-    except whois.parser.PywhoisError as e:
-        # WHOIS lookup failed - could mean domain is available or service error
-        # Assume available to avoid false negatives
-        logger.warning(
-            f"WHOIS lookup failed for {domain}: {e}. Assuming available."
-        )
-        return True
-
     except Exception as e:
-        # Unexpected error - log and assume available
-        logger.error(
-            f"Unexpected error checking {domain}: {e}. Assuming available.",
-            exc_info=True
+        # WHOIS lookup failed - could mean domain is available or service error
+        # Check if it's a "domain not found" error (domain is available)
+        error_str = str(e).lower()
+        if 'not found' in error_str or 'no match' in error_str:
+            logger.debug(f"{domain} is available (not found in WHOIS)")
+            return True
+
+        # Other errors - log and assume available to avoid false negatives
+        logger.warning(
+            f"WHOIS lookup error for {domain}: {e}. Assuming available."
         )
         return True
 
