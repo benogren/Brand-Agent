@@ -6,6 +6,8 @@ Gemini 2.5 Pro with multiple naming strategies and brand personality support.
 """
 
 import logging
+import json
+import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from google.cloud import aiplatform
@@ -15,6 +17,13 @@ try:
     from google_genai.adk import LlmAgent
 except ImportError:
     from src.utils.mock_adk import LlmAgent
+
+# Import Vertex AI Generative AI client
+try:
+    from vertexai.generative_models import GenerativeModel
+    VERTEXAI_AVAILABLE = True
+except ImportError:
+    VERTEXAI_AVAILABLE = False
 
 logger = logging.getLogger('brand_studio.name_generator')
 
@@ -233,13 +242,30 @@ class NameGeneratorAgent:
             num_names=num_names
         )
 
-        # For Phase 1, use placeholder generation
-        # In Phase 2, this will call self.agent.generate(user_brief)
-        names = self._generate_placeholder_names(
-            product_description=product_description,
-            brand_personality=brand_personality,
-            num_names=num_names
-        )
+        # Try to use real Vertex AI, fall back to placeholders
+        if VERTEXAI_AVAILABLE and os.getenv('GOOGLE_CLOUD_PROJECT') != 'test-project-local':
+            try:
+                names = self._generate_with_vertexai(user_brief, num_names)
+                logger.info(
+                    f"Generated {len(names)} brand names using Vertex AI",
+                    extra={'num_names': len(names)}
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Vertex AI generation failed: {e}. Falling back to placeholders."
+                )
+                names = self._generate_placeholder_names(
+                    product_description=product_description,
+                    brand_personality=brand_personality,
+                    num_names=num_names
+                )
+        else:
+            logger.info("Using placeholder generation (Vertex AI not configured)")
+            names = self._generate_placeholder_names(
+                product_description=product_description,
+                brand_personality=brand_personality,
+                num_names=num_names
+            )
 
         logger.info(
             f"Generated {len(names)} brand names successfully",
@@ -287,6 +313,67 @@ Please provide {num_names} creative brand names using a mix of naming strategies
 For each name, provide: brand_name, naming_strategy, rationale, tagline, syllables, memorable_score.
 """
         return brief.strip()
+
+    def _generate_with_vertexai(self, user_brief: str, num_names: int) -> List[Dict[str, Any]]:
+        """
+        Generate brand names using real Vertex AI Gemini model.
+
+        Args:
+            user_brief: Formatted user brief prompt
+            num_names: Number of names to generate
+
+        Returns:
+            List of brand name dictionaries
+
+        Raises:
+            Exception: If Vertex AI call fails
+        """
+        import vertexai
+        from vertexai.generative_models import GenerativeModel
+
+        # Initialize Vertex AI
+        vertexai.init(project=self.project_id, location=self.location)
+
+        # Use Gemini 2.5 Pro for creative generation
+        model = GenerativeModel("gemini-2.5-pro-002")
+
+        # Combine instruction and user brief
+        full_prompt = f"{NAME_GENERATOR_INSTRUCTION}\n\n{user_brief}\n\nPlease return the results as a JSON array of objects with the following structure:\n{{\n  \"brand_name\": \"ExampleName\",\n  \"naming_strategy\": \"portmanteau|descriptive|invented|acronym\",\n  \"rationale\": \"Brief explanation\",\n  \"tagline\": \"5-8 word tagline\",\n  \"syllables\": 2,\n  \"memorable_score\": 8\n}}\n\nReturn ONLY the JSON array, no other text."
+
+        logger.info("Calling Vertex AI Gemini 2.5 Pro...")
+
+        # Generate content
+        response = model.generate_content(full_prompt)
+
+        # Parse the response
+        try:
+            # Extract JSON from response
+            response_text = response.text.strip()
+
+            # Remove markdown code blocks if present
+            if response_text.startswith('```'):
+                response_text = response_text.split('```')[1]
+                if response_text.startswith('json'):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            # Parse JSON
+            names = json.loads(response_text)
+
+            # Validate we got a list
+            if not isinstance(names, list):
+                raise ValueError("Response is not a JSON array")
+
+            # Ensure we have the right number of names
+            if len(names) < num_names:
+                logger.warning(f"Generated {len(names)} names, requested {num_names}")
+
+            return names[:num_names]  # Return requested number
+
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.error(f"Failed to parse Vertex AI response: {e}")
+            logger.error(f"Response text: {response.text[:500]}")
+            raise Exception(f"Failed to parse brand names from Vertex AI: {e}")
 
     def _generate_placeholder_names(
         self,
