@@ -334,8 +334,9 @@ For each name, provide: brand_name, naming_strategy, rationale, tagline, syllabl
         # Initialize Vertex AI
         vertexai.init(project=self.project_id, location=self.location)
 
-        # Use Gemini 2.5 Pro for creative generation
-        model = GenerativeModel("gemini-2.5-pro-002")
+        # Use Gemini 1.5 Pro for creative generation
+        # Note: gemini-2.5-pro is not yet available in Vertex AI
+        model = GenerativeModel("gemini-1.5-pro-002")
 
         # Combine instruction and user brief
         full_prompt = f"{NAME_GENERATOR_INSTRUCTION}\n\n{user_brief}\n\nPlease return the results as a JSON array of objects with the following structure:\n{{\n  \"brand_name\": \"ExampleName\",\n  \"naming_strategy\": \"portmanteau|descriptive|invented|acronym\",\n  \"rationale\": \"Brief explanation\",\n  \"tagline\": \"5-8 word tagline\",\n  \"syllables\": 2,\n  \"memorable_score\": 8\n}}\n\nReturn ONLY the JSON array, no other text."
