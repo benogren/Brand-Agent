@@ -180,25 +180,36 @@ def check_domain_availability(
     .com, .ai, .io, .so, .app, .co, .is, .me, .net, and .to. Can also check prefix
     variations like get[name].com, try[name].com, etc.
 
+    Special handling:
+    - Prefixes (get-, try-, etc.) are ONLY applied to .com domains
+    - Names ending in "AI" get special .ai domain handling:
+      - For "NameAI": checks nameai.com, nameai.io, name.ai (without the AI suffix)
+      - Does NOT check nameai.ai (redundant)
+
     Args:
         brand_name: Brand name to check (will be converted to domain format)
         extensions: List of domain extensions to check (default: all 10 TLDs)
-        include_prefixes: If True, also check prefix variations (get-, try-, etc.)
+        include_prefixes: If True, also check prefix variations (only for .com)
 
     Returns:
         Dictionary mapping domain names to availability status:
         {
             'brandname.com': True,   # Available
             'brandname.ai': False,   # Taken
-            'getbrandname.com': True # Available (if include_prefixes=True)
+            'getbrandname.com': True # Available (if include_prefixes=True, .com only)
         }
 
     Examples:
         >>> check_domain_availability('MyBrand')
         {'mybrand.com': True, 'mybrand.ai': False, 'mybrand.io': True, ...}
 
-        >>> check_domain_availability('TestBrand', extensions=['.com'], include_prefixes=True)
-        {'testbrand.com': False, 'gettestbrand.com': True, 'trytestbrand.com': True, ...}
+        >>> check_domain_availability('NameAI', extensions=['.com', '.ai', '.io'])
+        {'nameai.com': True, 'name.ai': True, 'nameai.io': False}
+        # Note: nameai.ai is NOT checked (redundant)
+
+        >>> check_domain_availability('TestBrand', extensions=['.com', '.ai'], include_prefixes=True)
+        {'testbrand.com': False, 'gettestbrand.com': True, 'testbrand.ai': True}
+        # Note: Prefixes only apply to .com, not .ai
     """
     if extensions is None:
         extensions = DEFAULT_EXTENSIONS
@@ -206,18 +217,30 @@ def check_domain_availability(
     # Convert brand name to domain format (lowercase, remove spaces/special chars)
     domain_base = brand_name.lower().replace(' ', '').replace('-', '')
 
+    # Detect if name ends with "ai" (case-insensitive)
+    ends_with_ai = domain_base.endswith('ai') and len(domain_base) > 2
+
     # Build list of domain names to check
     domain_names = []
 
     # Add base brand name with all extensions
     for ext in extensions:
-        domain_names.append(f"{domain_base}{ext}")
+        # Special handling for .ai extension when name ends with "ai"
+        if ext == '.ai' and ends_with_ai:
+            # Remove the "ai" suffix and add .ai extension
+            # e.g., "nameai" becomes "name.ai"
+            # This avoids checking "nameai.ai" which is redundant
+            base_without_ai = domain_base[:-2]
+            domain_names.append(f"{base_without_ai}{ext}")
+        else:
+            # Normal case: just append extension
+            domain_names.append(f"{domain_base}{ext}")
 
-    # Add prefix variations if requested
+    # Add prefix variations if requested (ONLY for .com)
     if include_prefixes:
         for prefix in DOMAIN_PREFIXES:
-            for ext in extensions:
-                domain_names.append(f"{prefix}{domain_base}{ext}")
+            # Only add .com prefix variations
+            domain_names.append(f"{prefix}{domain_base}.com")
 
     results = {}
 
