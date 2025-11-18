@@ -202,48 +202,42 @@ def collect_feedback_interactive(names: List[str], iteration: int = 1, max_itera
     print("\n" + "=" * 70)
     print("What would you like to do?")
     print("=" * 70)
-    print("1. Approve and proceed to validation")
+    print("1. Select names and proceed to validation")
     print("2. Regenerate names with feedback")
-    print("3. Select specific names and proceed")
     if iteration < max_iterations:
-        print("4. Generate a completely fresh batch (ignore previous)")
+        print("3. Generate a completely fresh batch (ignore previous)")
     print("=" * 70)
 
     choice = input("\nYour choice: ").strip()
 
-    # Option 1: Approve all (or top 10)
+    # Option 1: Select names and proceed
     if choice == "1":
-        logger.info("User approved names, proceeding to validation")
-        return NameFeedback(
-            feedback_type=FeedbackType.APPROVE,
-            selected_names=names[:10]  # Top 10 names
-        )
+        selections = input("\nEnter numbers of names you like (e.g., 1,5,7,12) or 'all' for top 10: ").strip()
 
-    # Option 3: Select specific names
-    elif choice == "3":
-        selections = input("\nEnter numbers of names you like (e.g., 1,5,7,12): ").strip()
-        try:
-            indices = [int(x.strip()) - 1 for x in selections.split(",")]
-            selected = [names[i] for i in indices if 0 <= i < len(names)]
+        if selections.lower() == 'all':
+            selected = names[:10]
+            logger.info("User approved top 10 names")
+        else:
+            try:
+                indices = [int(x.strip()) - 1 for x in selections.split(",")]
+                selected = [names[i] for i in indices if 0 <= i < len(names)]
 
-            if not selected:
-                print("⚠️  No valid selections. Using top 10 names.")
+                if not selected:
+                    print("⚠️  No valid selections. Using top 10 names.")
+                    selected = names[:10]
+
+                logger.info(f"User selected {len(selected)} specific names")
+            except (ValueError, IndexError) as e:
+                print(f"⚠️  Invalid selection: {e}. Using top 10 names.")
                 selected = names[:10]
 
-            logger.info(f"User selected {len(selected)} specific names")
-            return NameFeedback(
-                feedback_type=FeedbackType.APPROVE,
-                selected_names=selected
-            )
-        except (ValueError, IndexError) as e:
-            print(f"⚠️  Invalid selection: {e}. Using top 10 names.")
-            return NameFeedback(
-                feedback_type=FeedbackType.APPROVE,
-                selected_names=names[:10]
-            )
+        return NameFeedback(
+            feedback_type=FeedbackType.APPROVE,
+            selected_names=selected
+        )
 
-    # Option 4: Completely fresh regeneration
-    elif choice == "4" and iteration < max_iterations:
+    # Option 3: Completely fresh regeneration
+    elif choice == "3" and iteration < max_iterations:
         logger.info("User requested fresh generation")
         return NameFeedback(
             feedback_type=FeedbackType.REGENERATE,
