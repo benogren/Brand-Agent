@@ -187,35 +187,14 @@ class BrandCollisionAgent:
         # Initialize Vertex AI
         aiplatform.init(project=project_id, location=location)
 
-        # Initialize Gen AI client with Vertex AI backend
-        try:
-            from google import genai
-            from google.genai.types import HttpOptions
+        # Use vertexai SDK (stable and working)
+        from vertexai.generative_models import GenerativeModel
+        self.model = GenerativeModel(model_name)
+        self.use_genai_sdk = False
 
-            # Set up environment for Vertex AI
-            os.environ['GOOGLE_CLOUD_PROJECT'] = project_id
-            os.environ['GOOGLE_CLOUD_LOCATION'] = location
-            os.environ['GOOGLE_GENAI_USE_VERTEXAI'] = 'True'
-
-            # Initialize client
-            self.client = genai.Client(
-                http_options=HttpOptions(api_version="v1alpha")
-            )
-            self.use_genai_sdk = True
-            logger.info(
-                f"BrandCollisionAgent initialized with google.genai SDK (model: {model_name})"
-            )
-        except ImportError:
-            logger.warning(
-                "google.genai SDK not available, falling back to vertexai SDK"
-            )
-            # Fallback to old SDK
-            from vertexai.preview.generative_models import GenerativeModel
-            self.model = GenerativeModel(model_name)
-            self.use_genai_sdk = False
-            logger.info(
-                f"BrandCollisionAgent initialized with vertexai SDK (model: {model_name})"
-            )
+        logger.info(
+            f"BrandCollisionAgent initialized with vertexai SDK (model: {model_name})"
+        )
 
     def analyze_brand_collision(
         self,
@@ -279,18 +258,16 @@ class BrandCollisionAgent:
         Returns:
             Dictionary with search results
         """
-        # Use the new google.genai SDK if available
-        if self.use_genai_sdk:
-            try:
-                from google.genai.types import (
-                    GenerateContentConfig,
-                    GoogleSearch,
-                    Tool,
-                )
+        try:
+            from vertexai.generative_models import Tool, grounding
 
-                # Perform search with grounding
-                search_prompt = f"""
-Search for "{brand_name}" and analyze what companies, products, or entities exist with this name.
+            # Create search tool - use the non-preview API
+            search_tool = Tool.from_google_search_retrieval(
+                grounding.GoogleSearchRetrieval()
+            )
+
+            search_prompt = f"""
+Search for "{brand_name}" and analyze what companies, products, or entities currently exist with this name.
 
 Focus on:
 1. Company websites and official pages
@@ -304,70 +281,31 @@ Provide a summary of the top search results with:
 - Industries they operate in
 - Web presence strength (website URLs, social media)
 - Relevance to {industry} industry
+
+If no significant entities are found, state that clearly.
 """
 
-                response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=search_prompt,
-                    config=GenerateContentConfig(
-                        tools=[Tool(google_search=GoogleSearch())],
-                        temperature=1.0  # Recommended for grounding
-                    )
-                )
+            response = self.model.generate_content(
+                search_prompt,
+                tools=[search_tool],
+                generation_config={"temperature": 1.0}  # Recommended for grounding
+            )
 
-                # Extract search results from response
-                search_summary = response.text if hasattr(response, 'text') else str(response)
+            search_summary = response.text if hasattr(response, 'text') else str(response)
 
-                logger.info(f"Google Search grounding successful for '{brand_name}'")
+            logger.info(f"Google Search grounding successful for '{brand_name}'")
 
-                return {
-                    'query': brand_name,
-                    'search_summary': search_summary,
-                    'grounding_metadata': {},
-                    'search_method': 'google_search_grounding'
-                }
+            return {
+                'query': brand_name,
+                'search_summary': search_summary,
+                'grounding_metadata': {},
+                'search_method': 'google_search_grounding'
+            }
 
-            except Exception as e:
-                logger.warning(f"Google Search grounding failed: {e}. Using model knowledge only.")
-                # Fallback to model knowledge without live search
-                return self._perform_knowledge_based_search(brand_name, industry)
-
-        # Fallback to old SDK (vertexai)
-        else:
-            try:
-                from vertexai.preview.generative_models import Tool
-                from vertexai.preview import grounding
-
-                # Create search tool
-                search_tool = Tool.from_google_search_retrieval(
-                    grounding.GoogleSearchRetrieval()
-                )
-
-                search_prompt = f"""
-Search for "{brand_name}" and analyze what companies, products, or entities exist with this name in the {industry} industry.
-Provide a summary of the top search results including entity names, types, and industries.
-"""
-
-                response = self.model.generate_content(
-                    search_prompt,
-                    tools=[search_tool]
-                )
-
-                search_summary = response.text if hasattr(response, 'text') else str(response)
-
-                logger.info(f"Google Search grounding successful for '{brand_name}' (vertexai SDK)")
-
-                return {
-                    'query': brand_name,
-                    'search_summary': search_summary,
-                    'grounding_metadata': {},
-                    'search_method': 'google_search_grounding_legacy'
-                }
-
-            except Exception as e:
-                logger.warning(f"Google Search grounding failed: {e}. Using model knowledge only.")
-                # Fallback to model knowledge without live search
-                return self._perform_knowledge_based_search(brand_name, industry)
+        except Exception as e:
+            logger.warning(f"Google Search grounding failed: {e}. Using model knowledge only.")
+            # Fallback to model knowledge without live search
+            return self._perform_knowledge_based_search(brand_name, industry)
 
     def _perform_knowledge_based_search(
         self,
@@ -398,18 +336,10 @@ If you don't know of any significant entities with this name, state that clearly
 """
 
         try:
-            if self.use_genai_sdk:
-                # Use new SDK
-                from google.genai.types import GenerateContentConfig
-
-                response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=knowledge_prompt,
-                    config=GenerateContentConfig(temperature=1.0)
-                )
-            else:
-                # Use old SDK
-                response = self.model.generate_content(knowledge_prompt)
+            response = self.model.generate_content(
+                knowledge_prompt,
+                generation_config={"temperature": 1.0}
+            )
 
             knowledge_summary = response.text if hasattr(response, 'text') else str(response)
 
@@ -496,18 +426,10 @@ Provide ONLY the JSON output, no additional text.
 
         try:
             # Generate collision analysis
-            if self.use_genai_sdk:
-                # Use new SDK
-                from google.genai.types import GenerateContentConfig
-
-                response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=analysis_prompt,
-                    config=GenerateContentConfig(temperature=0.7)  # Lower temp for structured output
-                )
-            else:
-                # Use old SDK
-                response = self.model.generate_content(analysis_prompt)
+            response = self.model.generate_content(
+                analysis_prompt,
+                generation_config={"temperature": 0.7}  # Lower temp for structured output
+            )
 
             response_text = response.text if hasattr(response, 'text') else str(response)
 
