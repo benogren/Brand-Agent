@@ -333,7 +333,7 @@ validated: true
 - [ ] 15.0 Integrate Vertex AI Memory Bank for Long-term Memory
   - [x] 15.1 Create src/session/memory_bank.py with Memory Bank API client
   - [x] 15.2 Create Memory Bank collection for brand_studio_memories
-  - [ ] 15.3 Store user preferences: industry, brand personality, accepted/rejected names
+  - [x] 15.3 Store user preferences: industry, brand personality, accepted/rejected names
   - [ ] 15.4 Implement retrieval of user preferences in orchestrator agent
   - [ ] 15.5 Add learning mechanism to improve suggestions based on past feedback
   - [ ] 15.6 Test memory persistence across multiple sessions with same user_id
