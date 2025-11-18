@@ -170,7 +170,7 @@ class BrandCollisionAgent:
         self,
         project_id: str,
         location: str = "us-central1",
-        model_name: str = "gemini-1.5-flash-002"  # Use 1.5 for search grounding support
+        model_name: str = "gemini-1.5-flash-001"  # Stable version available in all regions
     ):
         """
         Initialize the collision detection agent.
