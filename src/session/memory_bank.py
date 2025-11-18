@@ -207,6 +207,11 @@ class MemoryBankClient:
         """
         Get learning insights from user's past interactions.
 
+        Analyzes user preferences and brand feedback to extract patterns:
+        - Industries and personalities the user prefers
+        - Naming strategies that resonate with the user
+        - Common themes in accepted brand names (length, style, etc.)
+
         Args:
             user_id: User identifier
             limit: Maximum number of past interactions to analyze
@@ -216,7 +221,7 @@ class MemoryBankClient:
             - preferred_industries: List of industries
             - preferred_personalities: List of personalities
             - liked_naming_strategies: List of strategies
-            - common_themes: List of common themes
+            - common_themes: List of common themes (e.g., "short names", "tech-forward")
 
         Example:
             >>> client = MemoryBankClient()
@@ -235,6 +240,9 @@ class MemoryBankClient:
                 "common_themes": []
             }
 
+            # Track accepted brand names for pattern analysis
+            accepted_brands = []
+
             for pref in preferences[:limit]:
                 pref_type = pref.get('preference_type', '')
                 pref_value = pref.get('preference_value', '')
@@ -249,7 +257,26 @@ class MemoryBankClient:
                     if pref_value not in insights['liked_naming_strategies']:
                         insights['liked_naming_strategies'].append(pref_value)
 
-            logger.info(f"Generated learning insights for user {user_id}")
+                # Extract brand feedback data for deeper analysis
+                if pref.get('brand_name'):
+                    feedback_data = pref.get('feedback_data', {})
+                    if feedback_data:
+                        accepted_brands.append({
+                            'name': pref.get('brand_name'),
+                            'feedback_type': pref.get('feedback_type'),
+                            'data': feedback_data
+                        })
+
+            # Analyze accepted brand names to identify patterns
+            if accepted_brands:
+                themes = self._extract_naming_themes(accepted_brands)
+                insights['common_themes'] = themes
+
+            logger.info(
+                f"Generated learning insights for user {user_id}: "
+                f"{len(insights['preferred_industries'])} industries, "
+                f"{len(insights['common_themes'])} themes"
+            )
             return insights
 
         except Exception as e:
@@ -260,6 +287,85 @@ class MemoryBankClient:
                 "liked_naming_strategies": [],
                 "common_themes": []
             }
+
+    def _extract_naming_themes(self, accepted_brands: List[Dict[str, Any]]) -> List[str]:
+        """
+        Extract common themes from accepted brand names.
+
+        Analyzes patterns in:
+        - Name length (short vs. long)
+        - Syllable count
+        - Character patterns (has numbers, hyphens, etc.)
+        - Semantic themes
+
+        Args:
+            accepted_brands: List of accepted brand dictionaries with feedback data
+
+        Returns:
+            List of theme strings describing common patterns
+        """
+        themes = []
+
+        if not accepted_brands:
+            return themes
+
+        # Filter to only accepted names
+        accepted_names = [
+            b for b in accepted_brands
+            if b.get('feedback_type') == 'accepted'
+        ]
+
+        if not accepted_names:
+            return themes
+
+        # Analyze name lengths
+        name_lengths = [len(b['name']) for b in accepted_names]
+        avg_length = sum(name_lengths) / len(name_lengths) if name_lengths else 0
+
+        if avg_length < 7:
+            themes.append("short names (< 7 characters)")
+        elif avg_length > 12:
+            themes.append("longer names (> 12 characters)")
+        else:
+            themes.append("medium-length names (7-12 characters)")
+
+        # Analyze capitalization patterns
+        has_camelcase = any(
+            any(c.isupper() for c in b['name'][1:])  # Has uppercase after first char
+            for b in accepted_names
+        )
+        if has_camelcase:
+            themes.append("CamelCase or mixed-case style")
+
+        # Analyze SEO scores if available
+        seo_scores = [
+            b['data'].get('seo_score', 0)
+            for b in accepted_names
+            if 'data' in b and b['data'].get('seo_score')
+        ]
+        if seo_scores:
+            avg_seo = sum(seo_scores) / len(seo_scores)
+            if avg_seo > 80:
+                themes.append("high SEO scores preferred")
+
+        # Analyze industry context
+        industries = [
+            b['data'].get('industry')
+            for b in accepted_names
+            if 'data' in b and b['data'].get('industry')
+        ]
+        if industries:
+            industry_counts = {}
+            for ind in industries:
+                industry_counts[ind] = industry_counts.get(ind, 0) + 1
+            # Most common industry
+            if industry_counts:
+                top_industry = max(industry_counts, key=industry_counts.get)
+                if industry_counts[top_industry] > len(industries) / 2:
+                    themes.append(f"{top_industry}-focused naming")
+
+        logger.debug(f"Extracted {len(themes)} naming themes from {len(accepted_names)} accepted names")
+        return themes
 
     def _store_to_file(self, user_id: str, memory_data: Dict[str, Any]) -> bool:
         """Fallback: store memory data to file."""

@@ -419,7 +419,7 @@ class BrandStudioOrchestrator:
                         for name in approved_names
                     ]
 
-                    # Store feedback session
+                    # Store feedback session (both summary and full object for Memory Bank)
                     if feedback_session:
                         workflow_result['feedback_session'] = {
                             'session_id': feedback_session.session_id,
@@ -427,6 +427,8 @@ class BrandStudioOrchestrator:
                             'approved_names': feedback_session.approved_names,
                             'feedback_count': len(feedback_session.feedback_history)
                         }
+                        # Store full session object for Memory Bank extraction
+                        workflow_result['feedback_session_full'] = feedback_session
 
                     self.logger.info(
                         f"Name generation completed: {len(workflow_result['brand_names'])} names approved"
@@ -1061,16 +1063,60 @@ class BrandStudioOrchestrator:
                 )
             self.logger.debug(f"Stored {len(approved_names)} accepted brand names")
 
-            # Store rejected brand names from feedback session (if available)
-            if 'feedback_session' in workflow_result:
-                feedback_session = workflow_result.get('feedback_session', {})
-                # Extract feedback history to find rejected names
-                # Note: This requires the feedback_session to have detailed feedback
-                # For now, we'll mark this as a placeholder for future enhancement
-                self.logger.debug("Feedback session data stored (detailed rejection tracking pending)")
+            # Store detailed feedback from feedback session (if available)
+            feedback_session_full = workflow_result.get('feedback_session_full')
+            if feedback_session_full and hasattr(feedback_session_full, 'feedback_history'):
+                feedback_history = feedback_session_full.feedback_history
 
-            # Store naming strategies from feedback (if available)
-            # This will be implemented as part of Task 15.5 (learning mechanism)
+                for feedback in feedback_history:
+                    # Store liked names as preferences
+                    if feedback.liked_names:
+                        for liked_name in feedback.liked_names:
+                            self.memory_bank_client.store_brand_feedback(
+                                user_id=self.user_id,
+                                brand_name=liked_name,
+                                feedback_type='liked',
+                                feedback_data={
+                                    'session_timestamp': workflow_result.get('start_time'),
+                                    'industry': industry,
+                                    'brand_personality': brand_personality,
+                                    'liked_patterns': feedback.liked_patterns,
+                                    'liked_themes': feedback.liked_themes
+                                }
+                            )
+
+                    # Store disliked names as preferences
+                    if feedback.disliked_names:
+                        for disliked_name in feedback.disliked_names:
+                            self.memory_bank_client.store_brand_feedback(
+                                user_id=self.user_id,
+                                brand_name=disliked_name,
+                                feedback_type='rejected',
+                                feedback_data={
+                                    'session_timestamp': workflow_result.get('start_time'),
+                                    'industry': industry,
+                                    'brand_personality': brand_personality,
+                                    'disliked_patterns': feedback.disliked_patterns,
+                                    'disliked_themes': feedback.disliked_themes
+                                }
+                            )
+
+                    # Store preferred naming strategies
+                    if feedback.style_preferences:
+                        for strategy in feedback.style_preferences:
+                            self.memory_bank_client.store_user_preference(
+                                user_id=self.user_id,
+                                preference_type='naming_strategy',
+                                preference_value=strategy,
+                                metadata={
+                                    'session_timestamp': workflow_result.get('start_time'),
+                                    'source': 'feedback'
+                                }
+                            )
+
+                self.logger.debug(
+                    f"Stored detailed feedback from {len(feedback_history)} feedback iterations"
+                )
 
             self.logger.info(
                 f"Successfully stored user preferences for {self.user_id}: "
