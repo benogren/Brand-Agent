@@ -138,19 +138,24 @@ def _check_namecheap_availability(domain: str) -> Optional[bool]:
         import xml.etree.ElementTree as ET
         root = ET.fromstring(response.text)
 
-        # Find the domain check result
-        # Namecheap XML structure: <DomainCheckResult Domain="example.com" Available="true/false" />
+        # Namecheap uses namespace in all elements
+        # Format: {http://api.namecheap.com/xml.response}DomainCheckResult
         namespace = {'nc': 'http://api.namecheap.com/xml.response'}
-        domain_result = root.find(f".//nc:DomainCheckResult[@Domain='{domain}']", namespace)
 
-        if domain_result is None:
-            # Try without namespace
-            domain_result = root.find(f".//*[@Domain='{domain}']")
+        # Find the DomainCheckResult element for this domain
+        domain_result = root.find(f".//nc:DomainCheckResult[@Domain='{domain}']", namespace)
 
         if domain_result is not None:
             available = domain_result.get('Available', '').lower() == 'true'
             logger.debug(f"Namecheap API: {domain} is {'available' if available else 'taken'}")
             return available
+
+        # Fallback: try without namespace filtering (search all DomainCheckResult elements)
+        for elem in root.iter():
+            if elem.tag.endswith('DomainCheckResult') and elem.get('Domain') == domain:
+                available = elem.get('Available', '').lower() == 'true'
+                logger.debug(f"Namecheap API: {domain} is {'available' if available else 'taken'}")
+                return available
 
         logger.warning(f"Could not parse Namecheap response for {domain}")
         return None

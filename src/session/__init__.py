@@ -6,3 +6,7 @@ This module contains:
 - Models: Database schema models (sessions, events, generated_brands)
 - Memory Bank: Vertex AI Memory Bank integration for long-term memory
 """
+
+from src.session.memory_bank import MemoryBankClient, get_memory_bank_client
+
+__all__ = ['MemoryBankClient', 'get_memory_bank_client']

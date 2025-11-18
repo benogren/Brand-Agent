@@ -20,72 +20,109 @@ except ImportError:
 # Import feedback system
 from src.feedback import NameFeedback, FeedbackType, NameGenerationSession, collect_feedback_interactive
 
+# Import Memory Bank for long-term user preference storage
+from src.session.memory_bank import get_memory_bank_client
 
-# Orchestrator instruction prompt
+
+# Orchestrator instruction prompt - Enhanced for better coordination
 ORCHESTRATOR_INSTRUCTION = """
 You are the orchestrator for AI Brand Studio, a multi-agent system that generates
 legally-clear, SEO-optimized brand names with complete brand narratives.
 
-Your role is to:
+## YOUR CORE RESPONSIBILITIES
 
-1. ANALYZE USER'S PRODUCT BRIEF
-   - Extract key attributes: product description, target audience, industry, brand personality
-   - Identify the core problem the product solves
-   - Understand the competitive landscape context
-   - Validate that all required information is present
+### 1. ANALYZE USER'S PRODUCT BRIEF
+Extract and validate these critical elements:
+- **Product Description**: What the product does and its unique value
+- **Target Audience**: Who will use it (demographics, psychographics)
+- **Industry**: Specific market category for context
+- **Brand Personality**: Tone and character (professional, playful, innovative, luxury)
+- **Core Problem**: What pain point does this solve?
+- **Competitive Context**: How it differs from alternatives
 
-2. COORDINATE SUB-AGENTS TO GENERATE BRAND NAMES
-   - Research Agent: Gather industry trends and competitor naming patterns
-   - Name Generator Agent: Create 20-50 brand name candidates using RAG retrieval
-   - Validation Agent: Check domain availability (.com, .ai, .io) and trademark conflicts (USPTO, EU IPO)
-   - SEO Optimizer Agent: Analyze SEO metrics and generate meta titles/descriptions
-   - Story Generator Agent: Create brand narratives and marketing copy
+**Validation Checklist:**
+✓ Product description is clear and specific
+✓ Target audience is well-defined
+✓ Industry category is identified
+✓ Brand personality is specified
+✗ Reject vague or incomplete briefs
 
-3. ENSURE VALIDATION BEFORE PROCEEDING
-   - Verify at least 3 brand names have low trademark risk
-   - Ensure at least 5 names have .com domain available
-   - Stop workflow if validation fails and request regeneration (max 3 iterations)
-   - Only proceed to SEO and story generation after successful validation
+### 2. COORDINATE SPECIALIZED SUB-AGENTS
+Execute agents in this proven sequence:
 
-4. PRESENT RESULTS IN STRUCTURED FORMAT
-   - Top 5 brand name recommendations with:
-     * Brand name
-     * Domain availability status (.com, .ai, .io)
-     * Trademark risk level (low/medium/high)
-     * SEO score (0-100)
-     * 3-5 tagline options
-     * Brand story (150-300 words)
-     * Landing page hero copy (50-100 words)
-     * Value proposition (20-30 words)
-     * Meta title and description for SEO
+**STAGE 1: Research (Contextual Foundation)**
+→ Research Agent analyzes industry trends, competitor patterns, naming conventions
+→ Output: Industry insights, naming strategies, competitive landscape
 
-WORKFLOW EXECUTION:
-Execute agents in this sequence:
-1. Research Agent (gather context)
-2. Name Generator Agent (create candidates)
-3. Validation Agent (check legal/technical availability)
-4. IF validation passes:
-   - SEO Optimizer Agent (optimize for search)
-   - Story Generator Agent (create narratives)
-5. IF validation fails:
-   - Loop back to Name Generator (max 3 iterations)
-6. Present final brand package
+**STAGE 2: Generation (Creative Exploration)**
+→ Name Generator Agent creates 20-50 diverse candidates using RAG retrieval
+→ Output: Brand names with naming strategies, rationales, initial taglines
 
-IMPORTANT CONSTRAINTS:
-- Generate 20-50 brand name candidates minimum
-- Ensure names are pronounceable and memorable
-- Verify trademark conflicts before presenting to user
-- Match brand personality specified by user (playful, professional, innovative, luxury)
-- Provide complete brand package, not just names
+**STAGE 3: Validation (Legal/Technical Verification)**
+→ Validation Agent checks domains (.com, .ai, .io, +7 more) and trademarks (USPTO)
+→ Output: Domain availability, trademark risk levels, legal clearance
 
-OUTPUT FORMAT:
-Return results as a structured dictionary with:
-- brand_names: List of validated brand names
-- domain_status: Availability for each domain extension
-- trademark_risk: Risk assessment for each name
-- seo_scores: SEO scores for each name
-- selected_brands: Top 5 recommendations with complete brand packages
-- workflow_summary: Summary of what was executed
+**STAGE 4: Optimization (if validation passes)**
+→ SEO Optimizer Agent: Analyzes metrics, generates SEO metadata
+→ Story Generator Agent: Creates brand narratives and marketing copy
+→ Output: Complete brand package with content
+
+### 3. QUALITY GATES & ITERATION LOGIC
+Enforce these validation thresholds:
+
+**Minimum Requirements:**
+- ✓ At least 50% of names with LOW trademark risk (min 1 name)
+- ✓ At least 1 name with available domain (any TLD acceptable)
+- ✓ Names are pronounceable (vowel ratio 30-50%)
+- ✓ Names match specified brand personality
+
+**Iteration Strategy (Max 3 loops):**
+- Iteration 1: Generate fresh candidates
+- Iteration 2: Incorporate feedback, adjust naming strategies
+- Iteration 3: Final attempt with relaxed constraints if needed
+- After 3 failures: Present best available options with risk disclosure
+
+### 4. DELIVERABLE STRUCTURE
+Present a comprehensive brand package:
+
+**For Each Approved Name:**
+```
+{
+  "brand_name": "ClarityHealth",
+  "domain_availability": {
+    ".com": "available",
+    ".ai": "taken",
+    ".io": "available"
+  },
+  "trademark_risk": "low",
+  "seo_score": 85,
+  "taglines": [
+    "Healthcare Made Clear",
+    "Your Health, Simplified",
+    "Clarity in Every Care Decision"
+  ],
+  "brand_story": "150-300 word narrative...",
+  "hero_copy": "50-100 word landing page copy...",
+  "value_proposition": "20-30 word statement...",
+  "meta_title": "50-60 character SEO title",
+  "meta_description": "150-160 character SEO description"
+}
+```
+
+## SUCCESS CRITERIA
+✓ Generated 20-50 name candidates
+✓ Validated legal availability
+✓ Matched brand personality
+✓ Provided complete content package
+✓ Completed in ≤3 iterations
+
+## FAILURE HANDLING
+If unable to meet requirements after 3 iterations:
+1. Log specific blockers (e.g., "All names have trademark conflicts")
+2. Present best available options with risk warnings
+3. Suggest alternative approaches (different naming strategies, industries)
+
+Remember: Your goal is end-to-end brand creation, not just name generation. Ensure every deliverable is production-ready.
 """
 
 
@@ -111,7 +148,9 @@ class BrandStudioOrchestrator:
         model_name: str = "gemini-2.5-flash-lite",
         enable_cloud_logging: bool = True,
         name_generator_agent = None,
-        enable_interactive_feedback: bool = True
+        enable_interactive_feedback: bool = True,
+        enable_memory_bank: bool = True,
+        user_id: Optional[str] = None
     ):
         """
         Initialize the orchestrator agent.
@@ -123,6 +162,8 @@ class BrandStudioOrchestrator:
             enable_cloud_logging: Enable Cloud Logging integration
             name_generator_agent: Optional NameGeneratorAgent instance for actual name generation
             enable_interactive_feedback: Enable interactive feedback loop (default: True)
+            enable_memory_bank: Enable Memory Bank for long-term user preferences (default: True)
+            user_id: User identifier for Memory Bank storage
         """
         self.project_id = project_id
         self.location = location
@@ -130,6 +171,8 @@ class BrandStudioOrchestrator:
         self.sub_agents: List = []
         self.name_generator_agent = name_generator_agent
         self.enable_interactive_feedback = enable_interactive_feedback
+        self.enable_memory_bank = enable_memory_bank
+        self.user_id = user_id or "default_user"
 
         # Initialize logging
         self.logger = self._setup_logging(project_id, enable_cloud_logging)
@@ -140,9 +183,27 @@ class BrandStudioOrchestrator:
                 'location': location,
                 'model_name': model_name,
                 'has_name_generator': name_generator_agent is not None,
-                'interactive_feedback': enable_interactive_feedback
+                'interactive_feedback': enable_interactive_feedback,
+                'memory_bank_enabled': enable_memory_bank,
+                'user_id': self.user_id
             }
         )
+
+        # Initialize Memory Bank client if enabled
+        self.memory_bank_client = None
+        if self.enable_memory_bank:
+            try:
+                self.memory_bank_client = get_memory_bank_client(
+                    project_id=project_id,
+                    location=location
+                )
+                self.logger.info(f"Memory Bank initialized for user {self.user_id}")
+            except Exception as e:
+                self.logger.warning(
+                    f"Failed to initialize Memory Bank: {e}. "
+                    "Continuing without long-term memory."
+                )
+                self.memory_bank_client = None
 
         # Initialize Vertex AI
         try:
@@ -298,9 +359,24 @@ class BrandStudioOrchestrator:
         workflow_start_time = datetime.utcnow()
         self.logger.info("Starting brand creation workflow")
 
+        # Retrieve user preferences from Memory Bank (if enabled)
+        user_preferences = {}
+        if self.memory_bank_client:
+            try:
+                user_preferences = self._retrieve_user_preferences()
+                self.logger.info(
+                    f"Retrieved user preferences: {len(user_preferences.get('preferred_industries', []))} "
+                    f"industries, {len(user_preferences.get('preferred_personalities', []))} personalities"
+                )
+            except Exception as e:
+                self.logger.warning(f"Failed to retrieve user preferences: {e}")
+                user_preferences = {}
+
         # Analyze user brief
         try:
             analysis = self.analyze_user_brief(user_brief)
+            # Enrich analysis with user preferences
+            analysis['user_preferences'] = user_preferences
             # Store analysis for access by sub-methods
             self.current_analysis = analysis
         except Exception as e:
@@ -377,7 +453,7 @@ class BrandStudioOrchestrator:
                         for name in approved_names
                     ]
 
-                    # Store feedback session
+                    # Store feedback session (both summary and full object for Memory Bank)
                     if feedback_session:
                         workflow_result['feedback_session'] = {
                             'session_id': feedback_session.session_id,
@@ -385,6 +461,8 @@ class BrandStudioOrchestrator:
                             'approved_names': feedback_session.approved_names,
                             'feedback_count': len(feedback_session.feedback_history)
                         }
+                        # Store full session object for Memory Bank extraction
+                        workflow_result['feedback_session_full'] = feedback_session
 
                     self.logger.info(
                         f"Name generation completed: {len(workflow_result['brand_names'])} names approved"
@@ -541,6 +619,18 @@ class BrandStudioOrchestrator:
                 }
             )
 
+            # Store user preferences in Memory Bank if enabled
+            if self.memory_bank_client:
+                try:
+                    self._store_user_preferences(
+                        analysis=analysis,
+                        workflow_result=workflow_result
+                    )
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to store user preferences in Memory Bank: {e}"
+                    )
+
         except Exception as e:
             workflow_result['status'] = 'failed'
             workflow_result['error'] = str(e)
@@ -686,6 +776,9 @@ class BrandStudioOrchestrator:
 
             if name_generator_agent:
                 # Use actual name generator agent
+                # Extract user preferences if available
+                user_prefs = analysis.get('user_preferences', {})
+
                 generated_names = name_generator_agent.generate_names(
                     product_description=analysis.get('product_description', ''),
                     target_audience=analysis.get('target_audience', ''),
@@ -693,7 +786,8 @@ class BrandStudioOrchestrator:
                     industry=analysis.get('industry', 'general'),
                     num_names=30,
                     feedback_context=feedback_context,
-                    previous_names=previous_names
+                    previous_names=previous_names,
+                    user_preferences=user_prefs  # Pass user preferences from Memory Bank
                 )
             else:
                 # Placeholder for testing
@@ -931,3 +1025,223 @@ class BrandStudioOrchestrator:
         self.logger.info(f"Brand story generated successfully for {selected_name}")
 
         return story_result
+
+    def _store_user_preferences(
+        self,
+        analysis: Dict[str, Any],
+        workflow_result: Dict[str, Any]
+    ) -> None:
+        """
+        Store user preferences in Memory Bank for long-term learning.
+
+        Stores:
+        - Industry preferences
+        - Brand personality preferences
+        - Accepted brand names (from approved names)
+        - Rejected brand names (from feedback)
+        - Naming strategy preferences (from feedback)
+
+        Args:
+            analysis: User brief analysis
+            workflow_result: Complete workflow result
+        """
+        if not self.memory_bank_client:
+            return
+
+        self.logger.info(f"Storing user preferences for user {self.user_id}")
+
+        try:
+            # Store industry preference
+            industry = analysis.get('industry', 'general')
+            self.memory_bank_client.store_user_preference(
+                user_id=self.user_id,
+                preference_type='industry',
+                preference_value=industry,
+                metadata={
+                    'session_timestamp': workflow_result.get('start_time', datetime.utcnow().isoformat()),
+                    'source': 'user_brief'
+                }
+            )
+            self.logger.debug(f"Stored industry preference: {industry}")
+
+            # Store brand personality preference
+            brand_personality = analysis.get('brand_personality', 'professional')
+            self.memory_bank_client.store_user_preference(
+                user_id=self.user_id,
+                preference_type='personality',
+                preference_value=brand_personality,
+                metadata={
+                    'session_timestamp': workflow_result.get('start_time', datetime.utcnow().isoformat()),
+                    'source': 'user_brief'
+                }
+            )
+            self.logger.debug(f"Stored personality preference: {brand_personality}")
+
+            # Store accepted brand names
+            approved_names = workflow_result.get('brand_names', [])
+            for brand_name in approved_names:
+                # Extract name if it's a dict
+                name_str = brand_name if isinstance(brand_name, str) else brand_name.get('brand_name', str(brand_name))
+
+                self.memory_bank_client.store_brand_feedback(
+                    user_id=self.user_id,
+                    brand_name=name_str,
+                    feedback_type='accepted',
+                    feedback_data={
+                        'session_timestamp': workflow_result.get('start_time'),
+                        'industry': industry,
+                        'brand_personality': brand_personality,
+                        'validation_results': workflow_result.get('validation_results', {}).get(name_str, {}),
+                        'seo_score': workflow_result.get('seo_scores', {}).get(name_str, 0)
+                    }
+                )
+            self.logger.debug(f"Stored {len(approved_names)} accepted brand names")
+
+            # Store detailed feedback from feedback session (if available)
+            feedback_session_full = workflow_result.get('feedback_session_full')
+            if feedback_session_full and hasattr(feedback_session_full, 'feedback_history'):
+                feedback_history = feedback_session_full.feedback_history
+
+                for feedback in feedback_history:
+                    # Store liked names as preferences
+                    if feedback.liked_names:
+                        for liked_name in feedback.liked_names:
+                            self.memory_bank_client.store_brand_feedback(
+                                user_id=self.user_id,
+                                brand_name=liked_name,
+                                feedback_type='liked',
+                                feedback_data={
+                                    'session_timestamp': workflow_result.get('start_time'),
+                                    'industry': industry,
+                                    'brand_personality': brand_personality,
+                                    'liked_patterns': feedback.liked_patterns,
+                                    'liked_themes': feedback.liked_themes
+                                }
+                            )
+
+                    # Store disliked names as preferences
+                    if feedback.disliked_names:
+                        for disliked_name in feedback.disliked_names:
+                            self.memory_bank_client.store_brand_feedback(
+                                user_id=self.user_id,
+                                brand_name=disliked_name,
+                                feedback_type='rejected',
+                                feedback_data={
+                                    'session_timestamp': workflow_result.get('start_time'),
+                                    'industry': industry,
+                                    'brand_personality': brand_personality,
+                                    'disliked_patterns': feedback.disliked_patterns,
+                                    'disliked_themes': feedback.disliked_themes
+                                }
+                            )
+
+                    # Store preferred naming strategies
+                    if feedback.style_preferences:
+                        for strategy in feedback.style_preferences:
+                            self.memory_bank_client.store_user_preference(
+                                user_id=self.user_id,
+                                preference_type='naming_strategy',
+                                preference_value=strategy,
+                                metadata={
+                                    'session_timestamp': workflow_result.get('start_time'),
+                                    'source': 'feedback'
+                                }
+                            )
+
+                self.logger.debug(
+                    f"Stored detailed feedback from {len(feedback_history)} feedback iterations"
+                )
+
+            self.logger.info(
+                f"Successfully stored user preferences for {self.user_id}: "
+                f"industry={industry}, personality={brand_personality}, "
+                f"accepted_names={len(approved_names)}"
+            )
+
+        except Exception as e:
+            self.logger.error(
+                f"Error storing user preferences: {e}",
+                extra={'error_type': type(e).__name__}
+            )
+            # Don't raise - this is not critical to workflow success
+            pass
+
+    def _retrieve_user_preferences(self) -> Dict[str, Any]:
+        """
+        Retrieve user preferences from Memory Bank.
+
+        Returns:
+            Dictionary with user preferences:
+            - preferred_industries: List of industries the user has worked with
+            - preferred_personalities: List of brand personalities the user prefers
+            - past_accepted_names: List of brand names the user has accepted
+            - past_rejected_names: List of brand names the user has rejected
+            - learning_insights: Aggregated insights from past sessions
+        """
+        if not self.memory_bank_client:
+            self.logger.debug("Memory Bank not available, returning empty preferences")
+            return {
+                'preferred_industries': [],
+                'preferred_personalities': [],
+                'past_accepted_names': [],
+                'past_rejected_names': [],
+                'learning_insights': {}
+            }
+
+        self.logger.info(f"Retrieving user preferences for user {self.user_id}")
+
+        try:
+            # Retrieve all preferences for this user
+            all_preferences = self.memory_bank_client.retrieve_user_preferences(
+                user_id=self.user_id
+            )
+
+            # Parse preferences by type
+            industries = []
+            personalities = []
+            accepted_names = []
+            rejected_names = []
+
+            for pref in all_preferences:
+                pref_type = pref.get('preference_type', '')
+                pref_value = pref.get('preference_value', '')
+
+                if pref_type == 'industry' and pref_value not in industries:
+                    industries.append(pref_value)
+                elif pref_type == 'personality' and pref_value not in personalities:
+                    personalities.append(pref_value)
+
+            # Get learning insights (aggregated patterns from past sessions)
+            learning_insights = self.memory_bank_client.get_learning_insights(
+                user_id=self.user_id,
+                limit=20  # Look at last 20 interactions
+            )
+
+            preferences = {
+                'preferred_industries': industries,
+                'preferred_personalities': personalities,
+                'past_accepted_names': accepted_names,
+                'past_rejected_names': rejected_names,
+                'learning_insights': learning_insights
+            }
+
+            self.logger.info(
+                f"Retrieved preferences for {self.user_id}: "
+                f"{len(industries)} industries, {len(personalities)} personalities"
+            )
+
+            return preferences
+
+        except Exception as e:
+            self.logger.error(
+                f"Error retrieving user preferences: {e}",
+                extra={'error_type': type(e).__name__}
+            )
+            # Return empty preferences on error
+            return {
+                'preferred_industries': [],
+                'preferred_personalities': [],
+                'past_accepted_names': [],
+                'past_rejected_names': [],
+                'learning_insights': {}
+            }
