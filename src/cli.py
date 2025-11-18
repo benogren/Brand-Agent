@@ -754,8 +754,21 @@ def main():
                     print(f"  • Feedback rounds: {session['feedback_count']}")
                     print(f"  • Approved names: {len(session['approved_names'])}")
 
-                # Show validated names
-                if result.get('brand_names'):
+                # Show detailed names with full metadata
+                if result.get('brand_names_full'):
+                    print(f"\n{'=' * 70}")
+                    print(f"APPROVED BRAND NAMES ({len(result['brand_names_full'])} total)")
+                    print("=" * 70 + "\n")
+
+                    for i, name_data in enumerate(result['brand_names_full'], 1):
+                        brand_name = name_data.get('brand_name', 'Unknown')
+                        print(f"{i}. {brand_name}")
+                        print(f"   Strategy: {name_data.get('naming_strategy', 'N/A')}")
+                        print(f"   Rationale: {name_data.get('rationale', 'N/A')}")
+                        print(f"   Tagline: \"{name_data.get('tagline', 'N/A')}\"")
+                        print(f"   Syllables: {name_data.get('syllables', 'N/A')} | Memorable: {name_data.get('memorable_score', 'N/A')}/10")
+                        print()
+                elif result.get('brand_names'):
                     print(f"\n✓ {len(result['brand_names'])} names approved and validated")
                     print(f"  Names: {', '.join(result['brand_names'][:5])}")
                     if len(result['brand_names']) > 5:
@@ -763,7 +776,8 @@ def main():
 
                 # Show workflow summary
                 if result.get('workflow_summary'):
-                    print(f"\n{result['workflow_summary']}")
+                    print(f"{result['workflow_summary']}")
+                    print()
 
         elif result['status'] == 'validation_failed':
             print("\n⚠️  Validation failed after maximum attempts.")

@@ -392,7 +392,7 @@ For each name, provide: brand_name, naming_strategy, rationale, tagline, syllabl
                 location=self.location
             )
             response = client.models.generate_content(
-                model="gemini-1.5-flash",
+                model="gemini-2.0-flash-exp",
                 contents=full_prompt
             )
             logger.info("Successfully used Vertex AI!")
