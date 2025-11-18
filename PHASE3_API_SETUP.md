@@ -60,7 +60,7 @@ GOOGLE_CLOUD_LOCATION=us-central1
 GOOGLE_GENAI_USE_VERTEXAI=1
 
 # Google AI API Key (for Gemini models)
-GOOGLE_API_KEY=AIzaSyBM4oD_8hx57Ly0lJPiMxe-rwOqgztpHko
+GOOGLE_API_KEY=<your-api-key-here>
 
 # ============================================
 # OPTIONAL (Not needed for Phase 3)

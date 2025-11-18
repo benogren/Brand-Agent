@@ -12,7 +12,7 @@ All Phase 3 features are fully functional with your current configuration.
 ```
 ✅ Project ID: brand-agent-478519
 ✅ Location: us-central1
-✅ API Key: Configured (AIzaSy...pHko)
+✅ API Key: Configured (see .env file)
 ✅ Vertex AI: Enabled
 ```
 
@@ -43,8 +43,10 @@ All Phase 3 features are fully functional with your current configuration.
 
 **Your setup:**
 ```env
-GOOGLE_API_KEY=AIzaSyBM4oD_8hx57Ly0lJPiMxe-rwOqgztpHko
+GOOGLE_API_KEY=<your-api-key-here>
 ```
+
+**Note:** Your actual API key is stored securely in `.env` (not committed to git)
 
 **Status:** ✅ Working
 **Cost:** Free tier (15 requests/min)
@@ -102,7 +104,7 @@ GOOGLE_CLOUD_LOCATION=us-central1
 GOOGLE_GENAI_USE_VERTEXAI=1
 
 # Google AI API Key (REQUIRED)
-GOOGLE_API_KEY=AIzaSyBM4oD_8hx57Ly0lJPiMxe-rwOqgztpHko
+GOOGLE_API_KEY=<your-api-key-here>
 
 # Application Settings (OPTIONAL - using defaults)
 LOG_LEVEL=INFO
