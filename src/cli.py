@@ -754,11 +754,17 @@ def main():
                     print(f"  • Feedback rounds: {session['feedback_count']}")
                     print(f"  • Approved names: {len(session['approved_names'])}")
 
-                # Show detailed names with full metadata
+                # Show detailed names with full metadata, validation, and SEO
                 if result.get('brand_names_full'):
                     print(f"\n{'=' * 70}")
                     print(f"APPROVED BRAND NAMES ({len(result['brand_names_full'])} total)")
                     print("=" * 70 + "\n")
+
+                    validation_results = result.get('validation_results', {})
+                    seo_data = result.get('seo_data', {})
+                    domain_avail = validation_results.get('domain_availability', {})
+                    trademark = validation_results.get('trademark_results', {})
+                    seo_scores = seo_data.get('seo_scores', {})
 
                     for i, name_data in enumerate(result['brand_names_full'], 1):
                         brand_name = name_data.get('brand_name', 'Unknown')
@@ -767,6 +773,26 @@ def main():
                         print(f"   Rationale: {name_data.get('rationale', 'N/A')}")
                         print(f"   Tagline: \"{name_data.get('tagline', 'N/A')}\"")
                         print(f"   Syllables: {name_data.get('syllables', 'N/A')} | Memorable: {name_data.get('memorable_score', 'N/A')}/10")
+
+                        # Domain availability
+                        if brand_name in domain_avail:
+                            domains = domain_avail[brand_name]
+                            available = [ext for ext, avail in domains.items() if avail]
+                            if available:
+                                print(f"   Domains Available: {', '.join(available)}")
+                            else:
+                                print(f"   Domains Available: None")
+
+                        # Trademark risk
+                        if brand_name in trademark:
+                            risk = trademark[brand_name]
+                            risk_icon = "✓" if risk == "low" else ("⚠" if risk == "medium" else "✗")
+                            print(f"   Trademark Risk: {risk_icon} {risk.upper()}")
+
+                        # SEO score
+                        if brand_name in seo_scores:
+                            print(f"   SEO Score: {seo_scores[brand_name]}/100")
+
                         print()
                 elif result.get('brand_names'):
                     print(f"\n✓ {len(result['brand_names'])} names approved and validated")

@@ -653,6 +653,7 @@ class BrandStudioOrchestrator:
         feedback_context = None
         previous_names = []
         approved_names = None
+        liked_names_to_keep = []  # Track names user liked from previous iterations
 
         # Feedback loop
         while session is None or (not session.is_complete() and session.has_iterations_remaining()):
@@ -689,14 +690,23 @@ class BrandStudioOrchestrator:
             # Extract just the brand names for feedback display
             brand_names = [name['brand_name'] for name in generated_names]
 
+            # Merge with liked names from previous iterations
+            all_generated_names = generated_names.copy()
+            if liked_names_to_keep:
+                # Add liked names from previous iterations to the current batch
+                all_generated_names = liked_names_to_keep + generated_names
+                all_brand_names = [name['brand_name'] for name in all_generated_names]
+            else:
+                all_brand_names = brand_names
+
             # Record generation
             if session:
-                session.add_generation(brand_names)
+                session.add_generation(all_brand_names)
 
             # Collect user feedback (if enabled)
             if enable_feedback:
                 feedback = collect_feedback_interactive(
-                    names=brand_names,
+                    names=all_brand_names,
                     iteration=session.iteration,
                     max_iterations=session.max_iterations
                 )
@@ -705,11 +715,11 @@ class BrandStudioOrchestrator:
                 # Handle feedback
                 if feedback.feedback_type == FeedbackType.APPROVE:
                     # User approved - select names and exit loop
-                    selected_names = feedback.selected_names or brand_names[:10]
+                    selected_names = feedback.selected_names or all_brand_names[:10]
 
                     # Find full name dictionaries for selected names
                     approved_names = [
-                        name for name in generated_names
+                        name for name in all_generated_names
                         if name['brand_name'] in selected_names
                     ]
 
@@ -721,6 +731,20 @@ class BrandStudioOrchestrator:
                     # User wants to refine - prepare feedback context
                     feedback_context = feedback.to_prompt_context()
                     previous_names.extend(brand_names)
+
+                    # Preserve liked names from this iteration
+                    if feedback.liked_names:
+                        # Find full name dictionaries for liked names
+                        liked_name_dicts = [
+                            name for name in all_generated_names
+                            if name['brand_name'] in feedback.liked_names
+                        ]
+                        # Add to kept names (avoiding duplicates)
+                        for liked in liked_name_dicts:
+                            if liked not in liked_names_to_keep:
+                                liked_names_to_keep.append(liked)
+                        self.logger.info(f"Keeping {len(liked_name_dicts)} liked names for next iteration")
+
                     self.logger.info("User requested refinement, regenerating with feedback")
 
                 elif feedback.feedback_type == FeedbackType.REGENERATE:
