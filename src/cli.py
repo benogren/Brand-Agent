@@ -295,6 +295,251 @@ def print_brand_names(names: list, quiet: bool = False, verbose: bool = False):
             print()
 
 
+def print_brand_names_simple(names: list):
+    """
+    Print brand names in simple list format for selection.
+
+    Args:
+        names: List of brand name dictionaries
+    """
+    if not names:
+        print("No brand names generated.")
+        return
+
+    print(f"\nGENERATED BRAND NAMES ({len(names)} total)")
+    print("=" * 70 + "\n")
+
+    for i, name in enumerate(names, 1):
+        print(f"{i:2d}. {name['brand_name']:20s} - {name['rationale'][:50]}...")
+
+
+def get_user_selection(names: list, min_select: int = 5, max_select: int = 10) -> list:
+    """
+    Let user select their favorite brand names.
+
+    Args:
+        names: List of brand name dictionaries
+        min_select: Minimum number of names to select
+        max_select: Maximum number of names to select
+
+    Returns:
+        List of selected brand name dictionaries
+    """
+    print(f"\n{'=' * 70}")
+    print(f"SELECT YOUR FAVORITE NAMES ({min_select}-{max_select} names)")
+    print("=" * 70 + "\n")
+    print(f"Enter the numbers of your favorite names (comma-separated)")
+    print(f"Example: 1,5,7,12,18")
+    print(f"Or type 'all' to select all names")
+    print(f"Or type 'regenerate' to start over with new names\n")
+
+    while True:
+        selection_input = input(f"Your selection ({min_select}-{max_select} names): ").strip()
+
+        if selection_input.lower() == 'regenerate':
+            return 'regenerate'
+
+        if selection_input.lower() == 'all':
+            return names
+
+        try:
+            # Parse comma-separated numbers
+            selected_indices = [int(x.strip()) for x in selection_input.split(',')]
+
+            # Validate selection count
+            if len(selected_indices) < min_select:
+                print(f"  Error: Please select at least {min_select} names.\n")
+                continue
+            if len(selected_indices) > max_select:
+                print(f"  Error: Please select at most {max_select} names.\n")
+                continue
+
+            # Validate indices are within range
+            if any(idx < 1 or idx > len(names) for idx in selected_indices):
+                print(f"  Error: Numbers must be between 1 and {len(names)}.\n")
+                continue
+
+            # Get selected names
+            selected_names = [names[idx - 1] for idx in selected_indices]
+
+            # Confirm selection
+            print(f"\nYou selected {len(selected_names)} names:")
+            for name in selected_names:
+                print(f"  - {name['brand_name']}")
+
+            confirm = input("\nConfirm selection? (y/n): ").strip().lower()
+            if confirm == 'y':
+                return selected_names
+            else:
+                print("\nLet's try again...\n")
+                continue
+
+        except ValueError:
+            print("  Error: Please enter comma-separated numbers (e.g., 1,5,7,12).\n")
+            continue
+
+
+def run_phase3_validation(
+    config: Dict[str, str],
+    selected_names: List[Dict],
+    brief: Dict[str, Any],
+    verbose: bool = False
+) -> Dict[str, Any]:
+    """
+    Run Phase 3 validation on selected names: domain, trademark, SEO, and enhanced taglines.
+
+    Args:
+        config: Configuration dictionary
+        selected_names: List of selected brand name dictionaries
+        brief: User brief
+        verbose: Verbose output
+
+    Returns:
+        Dictionary with validation results
+    """
+    from src.tools.domain_checker import check_domain_availability
+    from src.tools.trademark_checker import search_trademarks_uspto
+    from src.agents.seo_agent import SEOAgent
+
+    print("\n" + "=" * 70)
+    print("PHASE 3: VALIDATING SELECTED NAMES")
+    print("=" * 70 + "\n")
+
+    results = {}
+
+    # Initialize SEO agent
+    seo_agent = SEOAgent(
+        project_id=config['project_id'],
+        location=config['location']
+    )
+
+    for i, name_dict in enumerate(selected_names, 1):
+        brand_name = name_dict['brand_name']
+        print(f"\n[{i}/{len(selected_names)}] Validating: {brand_name}")
+        print("-" * 70)
+
+        # Domain availability check
+        print("  Checking domain availability...")
+        domain_results = check_domain_availability(brand_name)
+
+        # Trademark risk assessment
+        print("  Checking trademark conflicts...")
+        trademark_results = search_trademarks_uspto(brand_name)
+
+        # SEO optimization
+        print("  Optimizing for SEO...")
+        seo_results = seo_agent.optimize_brand_seo(
+            brand_name=brand_name,
+            product_description=brief['product_description'],
+            industry=brief['industry']
+        )
+
+        # Store results
+        results[brand_name] = {
+            'original_data': name_dict,
+            'domain_availability': domain_results,
+            'trademark_risk': trademark_results,
+            'seo_optimization': seo_results
+        }
+
+        # Print summary
+        available_domains = [ext for ext, avail in domain_results.items() if avail]
+        print(f"  ✓ Domains available: {', '.join(available_domains) if available_domains else 'None'}")
+        print(f"  ✓ Trademark risk: {trademark_results['risk_level']}")
+        print(f"  ✓ SEO score: {seo_results['seo_score']}/100")
+
+    return results
+
+
+def print_validation_results(validation_results: Dict[str, Any]):
+    """
+    Print Phase 3 validation results in a formatted way.
+
+    Args:
+        validation_results: Dictionary with validation results
+    """
+    print("\n" + "=" * 70)
+    print("VALIDATION RESULTS")
+    print("=" * 70 + "\n")
+
+    for brand_name, results in validation_results.items():
+        print(f"\n{brand_name}")
+        print("-" * 70)
+
+        # Domain availability
+        domain_avail = results['domain_availability']
+        print(f"Domain Availability:")
+
+        # Group by extension for better display
+        available_domains = []
+        taken_domains = []
+
+        for domain, available in sorted(domain_avail.items()):
+            if available:
+                available_domains.append(domain)
+            else:
+                taken_domains.append(domain)
+
+        # Show available domains first (more important)
+        if available_domains:
+            print(f"  ✓ Available ({len(available_domains)}):")
+            for domain in available_domains[:5]:  # Show first 5
+                print(f"    • {domain}")
+            if len(available_domains) > 5:
+                print(f"    ... and {len(available_domains) - 5} more")
+
+        # Show taken domains
+        if taken_domains:
+            print(f"  ✗ Taken ({len(taken_domains)}):")
+            for domain in taken_domains[:3]:  # Show first 3
+                print(f"    • {domain}")
+            if len(taken_domains) > 3:
+                print(f"    ... and {len(taken_domains) - 3} more")
+
+        # Check if we should suggest alternatives
+        base_domains = [d for d in domain_avail.keys() if not any(
+            d.startswith(p) for p in ['get', 'try', 'your', 'my', 'hello', 'use']
+        )]
+        base_available = [d for d in base_domains if domain_avail[d]]
+
+        if not base_available:
+            # Suggest alternatives
+            prefix_domains = [d for d in available_domains if any(
+                d.startswith(p) for p in ['get', 'try', 'your', 'my', 'hello', 'use']
+            )]
+            if prefix_domains:
+                print(f"\n  💡 Try these variations:")
+                for domain in prefix_domains[:3]:
+                    print(f"    • {domain}")
+
+        # Trademark risk
+        tm_risk = results['trademark_risk']
+        risk_level = tm_risk['risk_level'].upper()
+        risk_color = {
+            'LOW': '✓',
+            'MEDIUM': '⚠',
+            'HIGH': '✗',
+            'CRITICAL': '✗✗'
+        }.get(risk_level, '?')
+        print(f"\nTrademark Risk: {risk_color} {risk_level}")
+        if tm_risk['conflicts_found'] > 0:
+            print(f"  Conflicts found: {tm_risk['conflicts_found']}")
+
+        # SEO optimization
+        seo_opt = results['seo_optimization']
+        print(f"\nSEO Score: {seo_opt['seo_score']}/100")
+        print(f"Meta Title: {seo_opt['meta_title']}")
+        print(f"Meta Description: {seo_opt['meta_description']}")
+        print(f"Primary Keywords: {', '.join(seo_opt['primary_keywords'])}")
+
+        # Enhanced taglines (from original + SEO)
+        print(f"\nTagline: \"{results['original_data']['tagline']}\"")
+
+        print()
+
+    print("=" * 70)
+
+
 def print_workflow_summary(result: Dict[str, Any], verbose: bool = False):
     """
     Print workflow execution summary.
@@ -448,33 +693,79 @@ def main():
                 'target_audience': args.audience,
                 'brand_personality': args.personality,
                 'industry': args.industry,
-                'count': args.count
+                'count': 20  # Start with 20 names for selection
             }
         else:
             # Interactive mode
             brief = get_user_brief_interactive()
+            # Override count to 20 for initial generation
+            brief['count'] = 20
 
         # Print user brief
         if not args.quiet:
             print_user_brief(brief, verbose=args.verbose)
 
-        # Generate brand names
-        # For Phase 1, use name generator directly
-        # In Phase 2, switch to orchestrator workflow
-        if args.verbose:
-            print("=" * 70)
-            print("EXECUTION")
-            print("=" * 70 + "\n")
+        # Interactive workflow loop
+        regenerate = True
+        validation_results = None
 
-        names = run_name_generator_only(config, brief, verbose=args.verbose)
+        while regenerate:
+            regenerate = False  # Will be set to True if user wants to regenerate
 
-        # Print results
-        print_brand_names(names, quiet=args.quiet, verbose=args.verbose)
+            # PHASE 1: Generate initial 20 brand names
+            if args.verbose:
+                print("=" * 70)
+                print("PHASE 1: GENERATING BRAND NAMES")
+                print("=" * 70 + "\n")
+
+            names = run_name_generator_only(config, brief, verbose=args.verbose)
+
+            # Print names in simple format for selection
+            if not args.quiet:
+                print_brand_names_simple(names)
+
+            # PHASE 2: User selection
+            selected_names = get_user_selection(names, min_select=5, max_select=10)
+
+            # Check if user wants to regenerate
+            if selected_names == 'regenerate':
+                print("\n🔄 Regenerating brand names with same brief...\n")
+                regenerate = True
+                continue
+
+            # PHASE 3: Run validation on selected names
+            validation_results = run_phase3_validation(
+                config=config,
+                selected_names=selected_names,
+                brief=brief,
+                verbose=args.verbose
+            )
+
+            # Print detailed validation results
+            print_validation_results(validation_results)
+
+            # Ask if user is satisfied or wants to regenerate
+            print("\n" + "=" * 70)
+            satisfied = input("Are you satisfied with these results? (y/n/regenerate): ").strip().lower()
+
+            if satisfied == 'regenerate' or satisfied == 'n':
+                print("\n🔄 Regenerating brand names with same brief...\n")
+                regenerate = True
+                continue
+            elif satisfied == 'y':
+                print("\n✓ Great! Your brand names are ready.")
+                break
+            else:
+                # Default to accepting results
+                print("\n✓ Your brand names are ready.")
+                break
 
         # Create result structure for JSON output
         result = {
             'user_brief': brief,
             'brand_names': names,
+            'selected_names': [n['brand_name'] for n in selected_names] if selected_names != 'regenerate' else [],
+            'validation_results': validation_results,
             'generated_at': datetime.utcnow().isoformat(),
             'status': 'completed'
         }
@@ -485,8 +776,8 @@ def main():
 
         # Print success message
         if not args.quiet:
-            print("=" * 70)
-            print(f"✓ Successfully generated {len(names)} brand names")
+            print("\n" + "=" * 70)
+            print(f"✓ Successfully validated {len(validation_results)} brand names")
             print("=" * 70 + "\n")
 
         sys.exit(0)

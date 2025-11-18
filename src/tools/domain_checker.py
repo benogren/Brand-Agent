@@ -2,17 +2,26 @@
 Domain Availability Checker Tool.
 
 This module provides domain availability checking functionality using
-the python-whois library to check .com, .ai, and .io domain extensions.
+the python-whois library to check multiple domain extensions including
+.com, .ai, .io, .so, .app, .co, .is, .me, .net, and .to.
+
+Also supports prefix variations like get[name].com, try[name].com, etc.
 """
 
 import logging
 import time
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Set
 from datetime import datetime, timedelta
 import whois
 
 # Configure logger
 logger = logging.getLogger('brand_studio.domain_checker')
+
+# Default domain extensions to check
+DEFAULT_EXTENSIONS = ['.com', '.ai', '.io', '.so', '.app', '.co', '.is', '.me', '.net', '.to']
+
+# Domain name prefixes for variations
+DOMAIN_PREFIXES = ['get', 'try', 'your', 'my', 'hello', 'use']
 
 
 class DomainCache:
@@ -79,50 +88,64 @@ _domain_cache = DomainCache(ttl_minutes=5)
 
 def check_domain_availability(
     brand_name: str,
-    extensions: Optional[List[str]] = None
+    extensions: Optional[List[str]] = None,
+    include_prefixes: bool = False
 ) -> Dict[str, bool]:
     """
     Check domain availability for a brand name across multiple extensions.
 
-    Uses python-whois library to query WHOIS databases for .com, .ai, and .io
-    domain availability. Implements error handling to assume availability on
-    lookup failures (defensive approach to avoid false negatives).
+    Uses python-whois library to query WHOIS databases for multiple TLDs including
+    .com, .ai, .io, .so, .app, .co, .is, .me, .net, and .to. Can also check prefix
+    variations like get[name].com, try[name].com, etc.
 
     Args:
         brand_name: Brand name to check (will be converted to domain format)
-        extensions: List of domain extensions to check (default: ['.com', '.ai', '.io'])
+        extensions: List of domain extensions to check (default: all 10 TLDs)
+        include_prefixes: If True, also check prefix variations (get-, try-, etc.)
 
     Returns:
         Dictionary mapping domain names to availability status:
         {
             'brandname.com': True,   # Available
             'brandname.ai': False,   # Taken
-            'brandname.io': True     # Available
+            'getbrandname.com': True # Available (if include_prefixes=True)
         }
 
     Examples:
         >>> check_domain_availability('MyBrand')
-        {'mybrand.com': True, 'mybrand.ai': False, 'mybrand.io': True}
+        {'mybrand.com': True, 'mybrand.ai': False, 'mybrand.io': True, ...}
 
-        >>> check_domain_availability('TestBrand', extensions=['.com'])
-        {'testbrand.com': False}
+        >>> check_domain_availability('TestBrand', extensions=['.com'], include_prefixes=True)
+        {'testbrand.com': False, 'gettestbrand.com': True, 'trytestbrand.com': True, ...}
     """
     if extensions is None:
-        extensions = ['.com', '.ai', '.io']
+        extensions = DEFAULT_EXTENSIONS
 
     # Convert brand name to domain format (lowercase, remove spaces/special chars)
     domain_base = brand_name.lower().replace(' ', '').replace('-', '')
+
+    # Build list of domain names to check
+    domain_names = []
+
+    # Add base brand name with all extensions
+    for ext in extensions:
+        domain_names.append(f"{domain_base}{ext}")
+
+    # Add prefix variations if requested
+    if include_prefixes:
+        for prefix in DOMAIN_PREFIXES:
+            for ext in extensions:
+                domain_names.append(f"{prefix}{domain_base}{ext}")
 
     results = {}
 
     logger.info(
         f"Checking domain availability for '{brand_name}' "
-        f"across {len(extensions)} extensions"
+        f"across {len(extensions)} extensions "
+        f"({'with' if include_prefixes else 'without'} prefix variations)"
     )
 
-    for ext in extensions:
-        domain = f"{domain_base}{ext}"
-
+    for domain in domain_names:
         # Check cache first
         cached_result = _domain_cache.get(domain)
         if cached_result is not None:
@@ -136,9 +159,14 @@ def check_domain_availability(
         # Cache the result for this single domain
         _domain_cache.set(domain, {domain: is_available})
 
+        # Small delay to avoid rate limiting
+        if len(domain_names) > 10:
+            time.sleep(0.05)  # 50ms delay for large batches
+
+    available_count = sum(results.values())
     logger.info(
         f"Domain check complete for '{brand_name}': "
-        f"{sum(results.values())} of {len(results)} available"
+        f"{available_count} of {len(results)} available"
     )
 
     return results
@@ -225,6 +253,60 @@ def batch_check_domains(
 
     logger.info(f"Batch domain check complete for {len(brand_names)} brands")
     return results
+
+
+def get_available_alternatives(
+    brand_name: str,
+    extensions: Optional[List[str]] = None
+) -> Dict[str, List[str]]:
+    """
+    Get available domain alternatives with prefix variations.
+
+    Args:
+        brand_name: Brand name to check
+        extensions: List of extensions (default: ['.com'])
+
+    Returns:
+        Dictionary with 'base' and 'variations' keys:
+        {
+            'base': {'brandname.com': True, 'brandname.ai': False, ...},
+            'variations': {'getbrandname.com': True, 'trybrandname.com': False, ...}
+        }
+    """
+    if extensions is None:
+        extensions = ['.com']  # Default to .com for alternatives
+
+    # Check base domains
+    base_results = check_domain_availability(brand_name, extensions, include_prefixes=False)
+
+    # Check prefix variations
+    variation_results = {}
+    domain_base = brand_name.lower().replace(' ', '').replace('-', '')
+
+    for prefix in DOMAIN_PREFIXES:
+        for ext in extensions:
+            domain = f"{prefix}{domain_base}{ext}"
+
+            # Check cache first
+            cached_result = _domain_cache.get(domain)
+            if cached_result is not None:
+                variation_results[domain] = cached_result[domain]
+                continue
+
+            # Perform WHOIS lookup
+            is_available = _check_single_domain(domain)
+            variation_results[domain] = is_available
+
+            # Cache the result
+            _domain_cache.set(domain, {domain: is_available})
+
+            # Small delay
+            time.sleep(0.05)
+
+    return {
+        'base': base_results,
+        'variations': variation_results
+    }
 
 
 def clear_cache() -> None:
