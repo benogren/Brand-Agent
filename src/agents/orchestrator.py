@@ -1017,8 +1017,10 @@ class BrandStudioOrchestrator:
         ]
 
     def _execute_validation(self, brand_names: List[str]) -> dict:
-        """Execute validation stage with real domain checking."""
+        """Execute validation stage with domain, trademark, and collision checking."""
         from src.tools.domain_checker import check_domain_availability
+        from src.tools.trademark_checker import search_trademarks_uspto
+        from src.agents.collision_agent import BrandCollisionAgent
 
         num_names = len(brand_names)
         domain_availability = {}
@@ -1044,8 +1046,6 @@ class BrandStudioOrchestrator:
                 available_com_count += 1
 
         # Trademark checking with USPTO
-        from src.tools.trademark_checker import search_trademarks_uspto
-
         trademark_results = {}
         low_risk_count = 0
 
@@ -1059,6 +1059,56 @@ class BrandStudioOrchestrator:
             if risk_level == 'low':
                 low_risk_count += 1
 
+        # Brand collision detection with web search (optional, non-blocking)
+        collision_results = {}
+        try:
+            self.logger.info(f"Checking brand collisions for {num_names} brand names")
+
+            # Initialize collision agent
+            collision_agent = BrandCollisionAgent(
+                project_id=self.project_id,
+                location=self.location
+            )
+
+            # Get industry and product description from analysis
+            industry = self.current_analysis.get('industry', 'general')
+            product_description = self.current_analysis.get('product_description', '')
+
+            for brand_name in brand_names:
+                try:
+                    collision_analysis = collision_agent.analyze_brand_collision(
+                        brand_name=brand_name,
+                        industry=industry,
+                        product_description=product_description
+                    )
+                    collision_results[brand_name] = collision_analysis
+                    self.logger.info(
+                        f"Collision check for '{brand_name}': "
+                        f"{collision_analysis.get('collision_risk_level', 'unknown')}"
+                    )
+                except Exception as e:
+                    self.logger.warning(
+                        f"Collision check failed for '{brand_name}': {e}"
+                    )
+                    collision_results[brand_name] = {
+                        'collision_risk_level': 'unknown',
+                        'risk_summary': 'Collision analysis unavailable',
+                        'error': str(e)
+                    }
+        except Exception as e:
+            # If collision agent fails to initialize, log warning and continue
+            self.logger.warning(
+                f"Collision detection agent unavailable: {e}. "
+                "Continuing validation without collision analysis."
+            )
+            # Set all collision results to unknown
+            for brand_name in brand_names:
+                collision_results[brand_name] = {
+                    'collision_risk_level': 'unknown',
+                    'risk_summary': 'Collision analysis unavailable',
+                    'note': 'Feature temporarily unavailable'
+                }
+
         self.logger.info(
             f"Validation complete: {available_com_count} .com domains available, "
             f"{low_risk_count} low-risk trademarks"
@@ -1067,6 +1117,7 @@ class BrandStudioOrchestrator:
         return {
             'domain_availability': domain_availability,
             'trademark_results': trademark_results,
+            'collision_results': collision_results,
             'risk_assessment': {},
             'low_risk_count': low_risk_count,
             'available_com_count': available_com_count
@@ -1132,6 +1183,7 @@ class BrandStudioOrchestrator:
 
         domain_availability = validation_results.get('domain_availability', {})
         trademark_results = validation_results.get('trademark_results', {})
+        collision_results = validation_results.get('collision_results', {})
 
         for i, name_data in enumerate(validated_names, 1):
             brand_name = name_data.get('brand_name', 'Unknown')
@@ -1153,6 +1205,44 @@ class BrandStudioOrchestrator:
                 risk = trademark_results[brand_name]
                 risk_icon = "✓" if risk == "low" else ("⚠" if risk == "medium" else "✗")
                 print(f"   {risk_icon} Trademark Risk: {risk.upper()}")
+
+            # Brand collision risk
+            if brand_name in collision_results:
+                collision = collision_results[brand_name]
+                collision_risk = collision.get('collision_risk_level', 'unknown')
+                risk_summary = collision.get('risk_summary', 'No summary available')
+
+                # Icon based on collision risk
+                if collision_risk == 'none':
+                    collision_icon = "✓"
+                elif collision_risk == 'low':
+                    collision_icon = "✓"
+                elif collision_risk == 'medium':
+                    collision_icon = "⚠"
+                elif collision_risk == 'high':
+                    collision_icon = "✗"
+                else:
+                    collision_icon = "?"
+
+                print(f"   {collision_icon} Market Collision: {collision_risk.upper()}")
+                print(f"      → {risk_summary}")
+
+                # Show error details if present
+                if 'error' in collision and collision_risk == 'unknown':
+                    error_msg = collision.get('error', 'Unknown error')
+                    print(f"      ℹ️  Note: Collision analysis unavailable")
+                    # Don't show technical error to end users, just note it's unavailable
+
+                # Show recommendation if available
+                recommendation = collision.get('recommendation', '')
+                if recommendation:
+                    rec_text = recommendation.upper()
+                    if recommendation == 'avoid':
+                        print(f"      ⛔ Recommendation: AVOID")
+                    elif recommendation == 'caution':
+                        print(f"      ⚠️  Recommendation: USE WITH CAUTION")
+                    elif recommendation == 'proceed':
+                        print(f"      ✅ Recommendation: PROCEED")
 
         print("\n" + "=" * 70)
 

@@ -218,6 +218,10 @@ validated: true
   - [x] 9.5 Implement risk assessment logic (low/medium/high/critical based on exact matches and similar marks)
   - [x] 9.6 Write validation agent instruction to flag conflicts and assign risk scores
   - [x] 9.7 Test validation agent with known trademarked names (integrated into live workflow)
+  - [x] 9.8 Create brand collision detection agent (src/agents/collision_agent.py)
+  - [x] 9.9 Implement web search-based collision analysis using Google Search grounding
+  - [x] 9.10 Integrate collision detection into validation workflow
+  - [x] 9.11 Update validation results display to show collision risk and recommendations
 
 - [ ] 10.0 Implement Social Media Handle Checker
   - [ ] 10.1 Create src/tools/social_handles.py with API integrations for Twitter, Instagram, LinkedIn
