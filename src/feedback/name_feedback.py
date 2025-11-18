@@ -212,24 +212,27 @@ def collect_feedback_interactive(names: List[str], iteration: int = 1, max_itera
 
     # Option 1: Select names and proceed
     if choice == "1":
-        selections = input("\nEnter numbers of names you like (e.g., 1,5,7,12) or 'all' for top 10: ").strip()
+        while True:
+            selections = input("\nEnter numbers of names you like (at least 1, e.g., 1,5,7,12) or 'all' for top 10: ").strip()
 
-        if selections.lower() == 'all':
-            selected = names[:10]
-            logger.info("User approved top 10 names")
-        else:
-            try:
-                indices = [int(x.strip()) - 1 for x in selections.split(",")]
-                selected = [names[i] for i in indices if 0 <= i < len(names)]
-
-                if not selected:
-                    print("⚠️  No valid selections. Using top 10 names.")
-                    selected = names[:10]
-
-                logger.info(f"User selected {len(selected)} specific names")
-            except (ValueError, IndexError) as e:
-                print(f"⚠️  Invalid selection: {e}. Using top 10 names.")
+            if selections.lower() == 'all':
                 selected = names[:10]
+                logger.info("User approved top 10 names")
+                break
+            else:
+                try:
+                    indices = [int(x.strip()) - 1 for x in selections.split(",")]
+                    selected = [names[i] for i in indices if 0 <= i < len(names)]
+
+                    if not selected:
+                        print("⚠️  No valid selections. Please enter at least one valid number.\n")
+                        continue
+
+                    logger.info(f"User selected {len(selected)} specific names")
+                    break
+                except (ValueError, IndexError) as e:
+                    print(f"⚠️  Invalid input: {e}. Please enter comma-separated numbers (e.g., 1,5,7).\n")
+                    continue
 
         return NameFeedback(
             feedback_type=FeedbackType.APPROVE,
