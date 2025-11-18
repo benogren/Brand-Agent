@@ -182,7 +182,9 @@ class NameGeneratorAgent:
         target_audience: str = "",
         brand_personality: str = "professional",
         industry: str = "general",
-        num_names: int = 30
+        num_names: int = 30,
+        feedback_context: Optional[str] = None,
+        previous_names: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """
         Generate brand name candidates based on user brief.
@@ -193,6 +195,8 @@ class NameGeneratorAgent:
             brand_personality: Desired personality (playful, professional, innovative, luxury)
             industry: Product industry/category
             num_names: Number of names to generate (default: 30, min: 20, max: 50)
+            feedback_context: Optional feedback from previous iteration (from NameFeedback.to_prompt_context())
+            previous_names: Optional list of previously generated names to avoid duplicates
 
         Returns:
             List of brand name candidates, each containing:
@@ -212,6 +216,14 @@ class NameGeneratorAgent:
             ... )
             >>> len(names)
             30
+
+            # With feedback
+            >>> feedback_ctx = "User LIKED: FlowMind, StreamTask. AVOID: Generic words like Pro, Max"
+            >>> refined_names = generator.generate_names(
+            ...     product_description="AI meal planning app",
+            ...     feedback_context=feedback_ctx,
+            ...     previous_names=[n['brand_name'] for n in names]
+            ... )
         """
         # Validate inputs
         num_names = max(20, min(50, num_names))  # Ensure between 20-50
@@ -239,7 +251,9 @@ class NameGeneratorAgent:
             target_audience=target_audience,
             brand_personality=brand_personality,
             industry=industry,
-            num_names=num_names
+            num_names=num_names,
+            feedback_context=feedback_context,
+            previous_names=previous_names
         )
 
         # Try to use real Vertex AI, fall back to placeholders
@@ -280,7 +294,9 @@ class NameGeneratorAgent:
         target_audience: str,
         brand_personality: str,
         industry: str,
-        num_names: int
+        num_names: int,
+        feedback_context: Optional[str] = None,
+        previous_names: Optional[List[str]] = None
     ) -> str:
         """
         Format the user brief for the LLM agent.
@@ -291,6 +307,8 @@ class NameGeneratorAgent:
             brand_personality: Brand personality
             industry: Industry category
             num_names: Number of names to generate
+            feedback_context: Optional user feedback from previous iteration
+            previous_names: Optional list of previously generated names
 
         Returns:
             Formatted user brief string
@@ -305,6 +323,32 @@ Generate {num_names} brand name candidates for the following product:
 **Brand Personality:** {brand_personality}
 
 **Industry:** {industry}
+"""
+
+        # Add feedback context if provided
+        if feedback_context:
+            brief += f"""
+
+=== USER FEEDBACK FROM PREVIOUS ITERATION ===
+
+{feedback_context}
+
+Based on this feedback, generate NEW names that incorporate what the user liked
+and avoid what they disliked. Focus on the new directions they want to explore.
+"""
+
+        # Add previous names to avoid duplicates
+        if previous_names:
+            brief += f"""
+
+=== PREVIOUSLY GENERATED NAMES (DO NOT REPEAT) ===
+
+{', '.join(previous_names[:20])}{"..." if len(previous_names) > 20 else ""}
+
+Generate COMPLETELY NEW names that are different from these previous suggestions.
+"""
+
+        brief += f"""
 
 Please provide {num_names} creative brand names using a mix of naming strategies
 (portmanteau, descriptive, invented, acronyms). Ensure each name matches the

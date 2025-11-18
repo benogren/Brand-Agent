@@ -642,30 +642,44 @@ def run_name_generator_only(
 def run_orchestrator_workflow(
     config: Dict[str, str],
     brief: Dict[str, Any],
-    verbose: bool = False
+    verbose: bool = False,
+    enable_interactive_feedback: bool = True
 ) -> Dict[str, Any]:
     """
-    Run full orchestrator workflow.
+    Run full orchestrator workflow with interactive feedback.
 
     Args:
         config: Configuration dictionary
         brief: User brief
         verbose: Verbose output
+        enable_interactive_feedback: Enable interactive feedback loop
 
     Returns:
         Workflow result dictionary
     """
     if verbose:
-        print("Initializing Orchestrator Agent...")
+        print("Initializing Name Generator Agent...")
 
-    orchestrator = BrandStudioOrchestrator(
+    # Initialize name generator agent
+    name_generator = NameGeneratorAgent(
         project_id=config['project_id'],
-        location=config['location'],
-        enable_cloud_logging=verbose
+        location=config['location']
     )
 
     if verbose:
-        print("Executing brand creation workflow...\n")
+        print("Initializing Orchestrator Agent...")
+
+    # Initialize orchestrator with name generator
+    orchestrator = BrandStudioOrchestrator(
+        project_id=config['project_id'],
+        location=config['location'],
+        enable_cloud_logging=verbose,
+        name_generator_agent=name_generator,
+        enable_interactive_feedback=enable_interactive_feedback
+    )
+
+    if verbose:
+        print("Executing brand creation workflow with interactive feedback...\n")
 
     result = orchestrator.coordinate_workflow(brief)
 
@@ -705,82 +719,78 @@ def main():
         if not args.quiet:
             print_user_brief(brief, verbose=args.verbose)
 
-        # Interactive workflow loop
-        regenerate = True
-        validation_results = None
+        # Run orchestrator workflow with interactive feedback
+        # The orchestrator will:
+        # 1. Generate names with the name generator agent
+        # 2. Collect user feedback interactively
+        # 3. Refine names based on feedback (up to 3 iterations)
+        # 4. Once approved, proceed to validation
+        # 5. Run SEO optimization and story generation
 
-        while regenerate:
-            regenerate = False  # Will be set to True if user wants to regenerate
-
-            # PHASE 1: Generate initial 20 brand names
-            if args.verbose:
-                print("=" * 70)
-                print("PHASE 1: GENERATING BRAND NAMES")
-                print("=" * 70 + "\n")
-
-            names = run_name_generator_only(config, brief, verbose=args.verbose)
-
-            # Print names in simple format for selection
-            if not args.quiet:
-                print_brand_names_simple(names)
-
-            # PHASE 2: User selection
-            selected_names = get_user_selection(names, min_select=5, max_select=10)
-
-            # Check if user wants to regenerate
-            if selected_names == 'regenerate':
-                print("\n🔄 Regenerating brand names with same brief...\n")
-                regenerate = True
-                continue
-
-            # PHASE 3: Run validation on selected names
-            validation_results = run_phase3_validation(
-                config=config,
-                selected_names=selected_names,
-                brief=brief,
-                verbose=args.verbose
-            )
-
-            # Print detailed validation results
-            print_validation_results(validation_results)
-
-            # Ask if user is satisfied or wants to regenerate
+        if args.verbose:
             print("\n" + "=" * 70)
-            satisfied = input("Are you satisfied with these results? (y/n/regenerate): ").strip().lower()
+            print("STARTING INTERACTIVE WORKFLOW")
+            print("=" * 70)
+            print("\nThe system will generate brand names and collect your feedback.")
+            print("You can refine the names up to 3 times before proceeding to validation.\n")
 
-            if satisfied == 'regenerate' or satisfied == 'n':
-                print("\n🔄 Regenerating brand names with same brief...\n")
-                regenerate = True
-                continue
-            elif satisfied == 'y':
-                print("\n✓ Great! Your brand names are ready.")
-                break
-            else:
-                # Default to accepting results
-                print("\n✓ Your brand names are ready.")
-                break
+        result = run_orchestrator_workflow(
+            config=config,
+            brief=brief,
+            verbose=args.verbose,
+            enable_interactive_feedback=True
+        )
 
-        # Create result structure for JSON output
-        result = {
-            'user_brief': brief,
-            'brand_names': names,
-            'selected_names': [n['brand_name'] for n in selected_names] if selected_names != 'regenerate' else [],
-            'validation_results': validation_results,
-            'generated_at': datetime.utcnow().isoformat(),
-            'status': 'completed'
-        }
+        # Check workflow status
+        if result['status'] == 'completed':
+            if not args.quiet:
+                print("\n✓ Workflow completed successfully!")
+
+                # Show feedback session info if available
+                if 'feedback_session' in result:
+                    session = result['feedback_session']
+                    print(f"\n📊 Feedback Summary:")
+                    print(f"  • Iterations: {session['iterations']}")
+                    print(f"  • Feedback rounds: {session['feedback_count']}")
+                    print(f"  • Approved names: {len(session['approved_names'])}")
+
+                # Show validated names
+                if result.get('brand_names'):
+                    print(f"\n✓ {len(result['brand_names'])} names approved and validated")
+                    print(f"  Names: {', '.join(result['brand_names'][:5])}")
+                    if len(result['brand_names']) > 5:
+                        print(f"  ... and {len(result['brand_names']) - 5} more")
+
+                # Show workflow summary
+                if result.get('workflow_summary'):
+                    print(f"\n{result['workflow_summary']}")
+
+        elif result['status'] == 'validation_failed':
+            print("\n⚠️  Validation failed after maximum attempts.")
+            print("   The generated names did not meet trademark/domain requirements.")
+            if not args.quiet:
+                print(f"\n   Error: {result.get('error', 'Unknown error')}")
+
+        else:
+            print(f"\n❌ Workflow failed: {result.get('error', 'Unknown error')}")
+            if args.verbose:
+                print(f"   Failed at stage: {result.get('failed_stage', 'unknown')}")
 
         # Save JSON output if requested
         if args.json:
             save_json_output(result, args.json, verbose=args.verbose)
 
         # Print success message
-        if not args.quiet:
+        if not args.quiet and result['status'] == 'completed':
             print("\n" + "=" * 70)
-            print(f"✓ Successfully validated {len(validation_results)} brand names")
+            print(f"✓ Brand naming workflow completed successfully!")
             print("=" * 70 + "\n")
 
-        sys.exit(0)
+        # Exit with appropriate status code
+        if result['status'] == 'completed':
+            sys.exit(0)
+        else:
+            sys.exit(1)
 
     except ValueError as e:
         print(f"\n❌ Configuration Error: {e}", file=sys.stderr)

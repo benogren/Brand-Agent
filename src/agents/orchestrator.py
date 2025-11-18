@@ -17,6 +17,9 @@ try:
 except ImportError:
     from src.utils.mock_adk import LlmAgent
 
+# Import feedback system
+from src.feedback import NameFeedback, FeedbackType, NameGenerationSession, collect_feedback_interactive
+
 
 # Orchestrator instruction prompt
 ORCHESTRATOR_INSTRUCTION = """
@@ -106,7 +109,9 @@ class BrandStudioOrchestrator:
         project_id: str,
         location: str = "us-central1",
         model_name: str = "gemini-2.5-flash-lite",
-        enable_cloud_logging: bool = True
+        enable_cloud_logging: bool = True,
+        name_generator_agent = None,
+        enable_interactive_feedback: bool = True
     ):
         """
         Initialize the orchestrator agent.
@@ -116,11 +121,15 @@ class BrandStudioOrchestrator:
             location: Google Cloud region
             model_name: Gemini model to use (default: gemini-2.5-flash-lite)
             enable_cloud_logging: Enable Cloud Logging integration
+            name_generator_agent: Optional NameGeneratorAgent instance for actual name generation
+            enable_interactive_feedback: Enable interactive feedback loop (default: True)
         """
         self.project_id = project_id
         self.location = location
         self.model_name = model_name
         self.sub_agents: List = []
+        self.name_generator_agent = name_generator_agent
+        self.enable_interactive_feedback = enable_interactive_feedback
 
         # Initialize logging
         self.logger = self._setup_logging(project_id, enable_cloud_logging)
@@ -129,7 +138,9 @@ class BrandStudioOrchestrator:
             extra={
                 'project_id': project_id,
                 'location': location,
-                'model_name': model_name
+                'model_name': model_name,
+                'has_name_generator': name_generator_agent is not None,
+                'interactive_feedback': enable_interactive_feedback
             }
         )
 
@@ -340,17 +351,41 @@ class BrandStudioOrchestrator:
                     self.logger.error(f"Research stage failed: {e}")
                     raise
 
-                # Stage 2: Name Generation
+                # Stage 2: Name Generation with Interactive Feedback
                 try:
                     workflow_result['current_stage'] = 'name_generation'
                     workflow_result['workflow_stages'].append('name_generation')
-                    self.logger.info("Executing name generation stage")
-                    workflow_result['brand_names'] = self._execute_name_generation(
-                        analysis,
-                        workflow_result['research_data']
+                    self.logger.info("Executing name generation stage with feedback")
+
+                    # Use feedback-enabled generation
+                    approved_names, feedback_session = self._execute_name_generation_with_feedback(
+                        analysis=analysis,
+                        research_data=workflow_result['research_data'],
+                        name_generator_agent=self.name_generator_agent,
+                        max_feedback_iterations=3,
+                        enable_feedback=self.enable_interactive_feedback
                     )
+
+                    # Store approved names (with full metadata)
+                    workflow_result['brand_names_full'] = approved_names
+
+                    # Extract just brand name strings for validation
+                    workflow_result['brand_names'] = [
+                        name['brand_name'] if isinstance(name, dict) else name
+                        for name in approved_names
+                    ]
+
+                    # Store feedback session
+                    if feedback_session:
+                        workflow_result['feedback_session'] = {
+                            'session_id': feedback_session.session_id,
+                            'iterations': feedback_session.iteration,
+                            'approved_names': feedback_session.approved_names,
+                            'feedback_count': len(feedback_session.feedback_history)
+                        }
+
                     self.logger.info(
-                        f"Name generation completed: {len(workflow_result['brand_names'])} names generated"
+                        f"Name generation completed: {len(workflow_result['brand_names'])} names approved"
                     )
                 except Exception as e:
                     self.logger.error(f"Name generation stage failed: {e}")
@@ -472,9 +507,17 @@ class BrandStudioOrchestrator:
             ]
 
             # Generate workflow summary
+            feedback_info = ""
+            if 'feedback_session' in workflow_result:
+                feedback_info = (
+                    f"User provided {workflow_result['feedback_session']['feedback_count']} "
+                    f"feedback iteration(s). "
+                )
+
             workflow_result['workflow_summary'] = (
                 f"Completed {len(workflow_result['workflow_stages'])} stages "
-                f"in {workflow_result['iteration']} iteration(s). "
+                f"in {workflow_result['iteration']} validation iteration(s). "
+                f"{feedback_info}"
                 f"Generated {len(workflow_result['brand_names'])} brand names. "
                 f"Selected: {top_brand}"
             )
@@ -571,6 +614,135 @@ class BrandStudioOrchestrator:
             'competitor_names': [],
             'naming_patterns': []
         }
+
+    def _execute_name_generation_with_feedback(
+        self,
+        analysis: dict,
+        research_data: dict,
+        name_generator_agent,
+        max_feedback_iterations: int = 3,
+        enable_feedback: bool = True
+    ) -> tuple[List[Dict[str, Any]], Optional[NameGenerationSession]]:
+        """
+        Execute name generation with interactive feedback loop.
+
+        Args:
+            analysis: User brief analysis
+            research_data: Research data from research stage
+            name_generator_agent: NameGeneratorAgent instance
+            max_feedback_iterations: Maximum feedback iterations allowed
+            enable_feedback: Enable interactive feedback (False for automated workflows)
+
+        Returns:
+            Tuple of (approved_names, session)
+            - approved_names: List of name dictionaries that user approved
+            - session: NameGenerationSession with feedback history (or None if disabled)
+        """
+        import uuid
+
+        # Create session to track feedback iterations
+        if enable_feedback:
+            session = NameGenerationSession(
+                session_id=str(uuid.uuid4()),
+                brief=analysis.get('product_description', ''),
+                max_iterations=max_feedback_iterations
+            )
+        else:
+            session = None
+
+        feedback_context = None
+        previous_names = []
+        approved_names = None
+
+        # Feedback loop
+        while session is None or (not session.is_complete() and session.has_iterations_remaining()):
+            # Generate names
+            self.logger.info(
+                f"Generating names (iteration {session.iteration + 1 if session else 1})"
+            )
+
+            if name_generator_agent:
+                # Use actual name generator agent
+                generated_names = name_generator_agent.generate_names(
+                    product_description=analysis.get('product_description', ''),
+                    target_audience=analysis.get('target_audience', ''),
+                    brand_personality=analysis.get('brand_personality', 'professional'),
+                    industry=analysis.get('industry', 'general'),
+                    num_names=30,
+                    feedback_context=feedback_context,
+                    previous_names=previous_names
+                )
+            else:
+                # Placeholder for testing
+                generated_names = [
+                    {
+                        'brand_name': f"Brand{i}",
+                        'naming_strategy': 'descriptive',
+                        'rationale': 'Placeholder name',
+                        'tagline': 'Placeholder tagline',
+                        'syllables': 2,
+                        'memorable_score': 7
+                    }
+                    for i in range(1, 31)
+                ]
+
+            # Extract just the brand names for feedback display
+            brand_names = [name['brand_name'] for name in generated_names]
+
+            # Record generation
+            if session:
+                session.add_generation(brand_names)
+
+            # Collect user feedback (if enabled)
+            if enable_feedback:
+                feedback = collect_feedback_interactive(
+                    names=brand_names,
+                    iteration=session.iteration,
+                    max_iterations=session.max_iterations
+                )
+                session.add_feedback(feedback)
+
+                # Handle feedback
+                if feedback.feedback_type == FeedbackType.APPROVE:
+                    # User approved - select names and exit loop
+                    selected_names = feedback.selected_names or brand_names[:10]
+
+                    # Find full name dictionaries for selected names
+                    approved_names = [
+                        name for name in generated_names
+                        if name['brand_name'] in selected_names
+                    ]
+
+                    session.approve(selected_names)
+                    self.logger.info(f"User approved {len(approved_names)} names")
+                    break
+
+                elif feedback.feedback_type == FeedbackType.REFINE:
+                    # User wants to refine - prepare feedback context
+                    feedback_context = feedback.to_prompt_context()
+                    previous_names.extend(brand_names)
+                    self.logger.info("User requested refinement, regenerating with feedback")
+
+                elif feedback.feedback_type == FeedbackType.REGENERATE:
+                    # User wants completely fresh batch
+                    feedback_context = feedback.additional_feedback
+                    previous_names = []  # Don't carry over previous names
+                    self.logger.info("User requested fresh regeneration")
+            else:
+                # No feedback - approve all names and exit
+                approved_names = generated_names
+                break
+
+        # If loop exited without approval (max iterations reached), use last batch
+        if approved_names is None:
+            self.logger.warning(
+                f"Max feedback iterations ({max_feedback_iterations}) reached without approval"
+            )
+            approved_names = generated_names[:10]  # Default to top 10
+            if session:
+                session.approve([name['brand_name'] for name in approved_names])
+
+        return approved_names, session
 
     def _execute_name_generation(
         self,
