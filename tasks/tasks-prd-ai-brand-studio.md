@@ -36,8 +36,9 @@ validated: true
 - `src/agents/research_agent.py` - Research Agent with Google Search tool
 - `src/agents/name_generator.py` - Name Generator Agent with RAG using Gemini 2.5 Pro
 - `src/agents/validation_agent.py` - Validation Agent for domain/trademark checking
-- `src/agents/seo_optimizer.py` - SEO Optimizer Agent
-- `src/agents/story_generator.py` - Story Generator Agent using Gemini 2.5 Pro
+- `src/agents/collision_agent.py` - Brand Collision Detection Agent with Google Search grounding
+- `src/agents/seo_optimizer.py` - SEO Optimizer Agent (renamed from seo_agent.py)
+- `src/agents/story_generator.py` - Story Generator Agent using Gemini 2.5 Pro (renamed from story_agent.py)
 
 ### Custom Tools Files (src/tools/)
 
@@ -89,6 +90,7 @@ validated: true
 - `tests/eval_config.json` - Evaluation configuration
 - `tests/test_domain_checker.py` - Unit tests for domain checker
 - `tests/test_trademark_search.py` - Unit tests for trademark search
+- `tests/test_collision_agent.py` - Unit tests for brand collision detection agent
 - `tests/test_seo_analyzer.py` - Unit tests for SEO analyzer
 - `tests/test_agents.py` - Integration tests for agent workflows
 - `tests/evaluators/name_quality.py` - Custom evaluator for name quality score
@@ -220,8 +222,23 @@ validated: true
   - [x] 9.7 Test validation agent with known trademarked names (integrated into live workflow)
   - [x] 9.8 Create brand collision detection agent (src/agents/collision_agent.py)
   - [x] 9.9 Implement web search-based collision analysis using Google Search grounding
+    - [x] 9.9.1 Configure Google AI Studio API with GOOGLE_API_KEY authentication
+    - [x] 9.9.2 Implement google_search tool integration with gemini-2.5-flash model
+    - [x] 9.9.3 Add graceful fallback to model knowledge when search unavailable
+    - [x] 9.9.4 Handle GOOGLE_GENAI_USE_VERTEXAI flag to use AI Studio instead of Vertex AI
   - [x] 9.10 Integrate collision detection into validation workflow
+    - [x] 9.10.1 Add collision detection to orchestrator._execute_validation()
+    - [x] 9.10.2 Make collision detection non-blocking (continues on error)
+    - [x] 9.10.3 Store collision results in validation_results dictionary
   - [x] 9.11 Update validation results display to show collision risk and recommendations
+    - [x] 9.11.1 Display collision risk level (none/low/medium/high)
+    - [x] 9.11.2 Show risk summary explaining the collision concern
+    - [x] 9.11.3 Display recommendations (proceed/caution/avoid)
+    - [x] 9.11.4 Show entity details and differentiation challenges
+  - [x] 9.12 Test and verify live Google Search grounding functionality
+    - [x] 9.12.1 Verified search returns live web results (not just model knowledge)
+    - [x] 9.12.2 Tested collision detection with real brand names (CraftAI example)
+    - [x] 9.12.3 Confirmed proper risk assessment (detected existing companies with $27M funding)
 
 - [ ] 10.0 Implement Social Media Handle Checker
   - [ ] 10.1 Create src/tools/social_handles.py with API integrations for Twitter, Instagram, LinkedIn
