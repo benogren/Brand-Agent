@@ -193,9 +193,17 @@ class BrandCollisionAgent:
             if not api_key:
                 raise ValueError("GOOGLE_API_KEY not found in environment")
 
-            # Initialize client with API key
+            # IMPORTANT: Disable Vertex AI mode to use AI Studio API
+            # Temporarily remove the Vertex AI flag if it exists
+            vertex_ai_flag = os.environ.pop('GOOGLE_GENAI_USE_VERTEXAI', None)
+
+            # Initialize client with API key (this will use AI Studio, not Vertex AI)
             self.client = genai.Client(api_key=api_key)
             self.use_genai_client = True
+
+            # Restore the flag for other components that need it
+            if vertex_ai_flag:
+                os.environ['GOOGLE_GENAI_USE_VERTEXAI'] = vertex_ai_flag
 
             logger.info(
                 f"BrandCollisionAgent initialized with Google AI Studio API (model: {model_name})"
